@@ -105,14 +105,14 @@ function Index() {
 
   const advanceStatus = (event: MouseEvent<HTMLButtonElement>) => {
     const button = event.currentTarget;
-    const currentStatus = (button.dataset.status ?? "pending") as AppointmentStatus;
+    const currentStatus = (button.dataset["status"] ?? "pending") as AppointmentStatus;
     const nextStatus: AppointmentStatus =
       currentStatus === "pending" ? "progress" : currentStatus === "progress" ? "done" : "pending";
-    const clientName = button.dataset.client ?? "Cliente";
+    const clientName = button.dataset["client"] ?? "Cliente";
     const label = statusCopy[nextStatus];
     const labelElement = button.querySelector("[data-status-label]");
     if (labelElement) labelElement.textContent = label;
-    button.dataset.status = nextStatus;
+    button.dataset["status"] = nextStatus;
     button.setAttribute("aria-label", `${clientName}: ${label}. Tocar para cambiar estado.`);
     button.classList.toggle("border-border", nextStatus === "pending");
     button.classList.toggle("bg-surface-soft", nextStatus === "pending");

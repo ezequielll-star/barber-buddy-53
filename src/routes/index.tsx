@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { Component } from "react";
 import {
   CalendarDays,
   ChevronRight,
@@ -100,12 +100,12 @@ const navItems = [
   { label: "Ajustes", icon: Settings, active: false },
 ];
 
-function Index() {
-  const [appointments, setAppointments] = useState(initialAppointments);
+class Index extends Component<Record<string, never>, { appointments: Appointment[] }> {
+  state = { appointments: initialAppointments };
 
-  const advanceStatus = (id: number) => {
-    setAppointments((current) =>
-      current.map((appointment) => {
+  advanceStatus = (id: number) => {
+    this.setState(({ appointments }) => ({
+      appointments: appointments.map((appointment) => {
         if (appointment.id !== id) return appointment;
         const nextStatus: AppointmentStatus =
           appointment.status === "pending"
@@ -115,12 +115,14 @@ function Index() {
               : "pending";
         return { ...appointment, status: nextStatus };
       }),
-    );
+    }));
   };
 
-  const completed = appointments.filter((appointment) => appointment.status === "done").length;
+  render() {
+    const { appointments } = this.state;
+    const completed = appointments.filter((appointment) => appointment.status === "done").length;
 
-  return (
+    return (
     <main className="min-h-dvh bg-background pb-28 text-foreground">
       <div className="mx-auto w-full max-w-md px-5 pt-[max(1.25rem,env(safe-area-inset-top))] md:max-w-xl">
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-3">
@@ -201,7 +203,7 @@ function Index() {
                     <Button
                       type="button"
                       variant={appointment.status === "pending" ? "outline" : "default"}
-                      onClick={() => advanceStatus(appointment.id)}
+                      onClick={() => this.advanceStatus(appointment.id)}
                       aria-label={`${appointment.name}: ${statusCopy[appointment.status]}. Tocar para cambiar estado.`}
                       className={cn(
                         "mt-4 h-11 w-full justify-between px-4 text-sm font-bold",
@@ -245,5 +247,6 @@ function Index() {
         </div>
       </nav>
     </main>
-  );
+    );
+  }
 }

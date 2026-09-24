@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Component } from "react";
+import type { MouseEvent } from "react";
 import {
   CalendarDays,
   ChevronRight,
@@ -100,29 +100,35 @@ const navItems = [
   { label: "Ajustes", icon: Settings, active: false },
 ];
 
-class Index extends Component<Record<string, never>, { appointments: Appointment[] }> {
-  state = { appointments: initialAppointments };
+function Index() {
+  const completed = initialAppointments.filter((appointment) => appointment.status === "done").length;
 
-  advanceStatus = (id: number) => {
-    this.setState(({ appointments }) => ({
-      appointments: appointments.map((appointment) => {
-        if (appointment.id !== id) return appointment;
-        const nextStatus: AppointmentStatus =
-          appointment.status === "pending"
-            ? "progress"
-            : appointment.status === "progress"
-              ? "done"
-              : "pending";
-        return { ...appointment, status: nextStatus };
-      }),
-    }));
+  const advanceStatus = (event: MouseEvent<HTMLButtonElement>) => {
+    const button = event.currentTarget;
+    const currentStatus = (button.dataset.status ?? "pending") as AppointmentStatus;
+    const nextStatus: AppointmentStatus =
+      currentStatus === "pending" ? "progress" : currentStatus === "progress" ? "done" : "pending";
+    const clientName = button.dataset.client ?? "Cliente";
+    const label = statusCopy[nextStatus];
+    const labelElement = button.querySelector("[data-status-label]");
+    if (labelElement) labelElement.textContent = label;
+    button.dataset.status = nextStatus;
+    button.setAttribute("aria-label", `${clientName}: ${label}. Tocar para cambiar estado.`);
+    button.classList.toggle("border-border", nextStatus === "pending");
+    button.classList.toggle("bg-surface-soft", nextStatus === "pending");
+    button.classList.toggle("text-foreground", nextStatus === "pending");
+    button.classList.toggle("bg-primary", nextStatus === "progress");
+    button.classList.toggle("text-primary-foreground", nextStatus === "progress");
+    button.classList.toggle("bg-success", nextStatus === "done");
+    button.classList.toggle("text-success-foreground", nextStatus === "done");
+
+    const completedElement = document.querySelector("[data-completed-count]");
+    if (completedElement) {
+      completedElement.textContent = String(document.querySelectorAll('button[data-status="done"]').length);
+    }
   };
 
-  render() {
-    const { appointments } = this.state;
-    const completed = appointments.filter((appointment) => appointment.status === "done").length;
-
-    return (
+  return (
     <main className="min-h-dvh bg-background pb-28 text-foreground">
       <div className="mx-auto w-full max-w-md px-5 pt-[max(1.25rem,env(safe-area-inset-top))] md:max-w-xl">
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-3">
@@ -153,11 +159,11 @@ class Index extends Component<Record<string, never>, { appointments: Appointment
           <h1 className="mt-1 text-4xl font-extrabold leading-tight">Turnos de hoy</h1>
           <div className="mt-5 grid grid-cols-2 gap-3 border-y border-border py-4">
             <div>
-              <p className="text-2xl font-bold">{appointments.length}</p>
+              <p className="text-2xl font-bold">{initialAppointments.length}</p>
               <p className="text-xs font-medium text-muted-foreground">Turnos agendados</p>
             </div>
             <div className="border-l border-border pl-4">
-              <p className="text-2xl font-bold text-primary">{completed}</p>
+              <p data-completed-count className="text-2xl font-bold text-primary">{completed}</p>
               <p className="text-xs font-medium text-muted-foreground">Finalizados</p>
             </div>
           </div>
@@ -172,7 +178,7 @@ class Index extends Component<Record<string, never>, { appointments: Appointment
           </div>
 
           <ol className="space-y-3">
-            {appointments.map((appointment) => (
+            {initialAppointments.map((appointment) => (
               <li
                 key={appointment.id}
                 className={cn(
@@ -203,7 +209,9 @@ class Index extends Component<Record<string, never>, { appointments: Appointment
                     <Button
                       type="button"
                       variant={appointment.status === "pending" ? "outline" : "default"}
-                      onClick={() => this.advanceStatus(appointment.id)}
+                      onClick={advanceStatus}
+                      data-status={appointment.status}
+                      data-client={appointment.name}
                       aria-label={`${appointment.name}: ${statusCopy[appointment.status]}. Tocar para cambiar estado.`}
                       className={cn(
                         "mt-4 h-11 w-full justify-between px-4 text-sm font-bold",
@@ -211,7 +219,7 @@ class Index extends Component<Record<string, never>, { appointments: Appointment
                         appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90",
                       )}
                     >
-                      <span>{statusCopy[appointment.status]}</span>
+                      <span data-status-label>{statusCopy[appointment.status]}</span>
                       <ChevronRight aria-hidden="true" className="size-4" />
                     </Button>
                   </div>
@@ -247,6 +255,5 @@ class Index extends Component<Record<string, never>, { appointments: Appointment
         </div>
       </nav>
     </main>
-    );
-  }
+  );
 }

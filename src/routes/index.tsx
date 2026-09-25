@@ -6,6 +6,8 @@ import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { appointments, statusCopy, type Appointment, type AppointmentStatus } from "@/lib/barbershop-data";
+import { PaymentDialog, openPaymentDialog } from "@/components/payment-dialog";
+import { servicePrices } from "@/lib/cash-store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -103,6 +105,10 @@ function TodayPage() {
     button.className = cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", next === "pending" && "border border-border bg-surface-soft text-foreground", next === "progress" && "bg-primary text-primary-foreground", next === "done" && "bg-success text-success-foreground hover:bg-success/90");
     const count = document.querySelector("[data-completed-count]");
     if (count) count.textContent = String(document.querySelectorAll('button[data-status="done"]').length);
+    if (next === "done") {
+      const concept = button.dataset["service"] ?? "";
+      openPaymentDialog("payment-dialog", { client: button.dataset["name"], concept, amount: servicePrices[concept] });
+    }
   };
 
   return (
@@ -119,13 +125,14 @@ function TodayPage() {
             <li key={appointment.id} className={cn("relative overflow-hidden rounded-lg border bg-card p-4", appointment.status === "progress" ? "border-primary/60" : "border-border", appointment.status === "done" && "opacity-75")}>
               {appointment.status === "progress" && <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
               <AppointmentSheet appointment={appointment} />
-              <Button type="button" variant={appointment.status === "pending" ? "outline" : "default"} onClick={advanceStatus} data-status={appointment.status} className={cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", appointment.status === "pending" && "border-border bg-surface-soft text-foreground", appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90")}>
+              <Button type="button" variant={appointment.status === "pending" ? "outline" : "default"} onClick={advanceStatus} data-status={appointment.status} data-name={appointment.name} data-service={appointment.service} className={cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", appointment.status === "pending" && "border-border bg-surface-soft text-foreground", appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90")}>
                 <span data-status-label>{statusCopy[appointment.status]}</span><ChevronRight aria-hidden="true" className="size-4" />
               </Button>
             </li>
           ))}
         </ol>
       </section>
+      <PaymentDialog id="payment-dialog" />
     </BarbershopShell>
   );
 }

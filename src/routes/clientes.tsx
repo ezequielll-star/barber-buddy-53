@@ -13,7 +13,7 @@ export const Route = createFileRoute("/clientes")({
 function filterClients(event: React.FormEvent<HTMLInputElement>) {
   const query = event.currentTarget.value.trim().toLowerCase();
   document.querySelectorAll<HTMLElement>("[data-client-card]").forEach((card) => {
-    const haystack = `${card.dataset.clientName ?? ""} ${card.dataset.clientPhone ?? ""}`;
+    const haystack = `${card.dataset["clientName"] ?? ""} ${card.dataset["clientPhone"] ?? ""}`;
     card.hidden = query.length > 0 && !haystack.includes(query);
   });
   const empty = document.querySelector<HTMLElement>("[data-clients-empty]");

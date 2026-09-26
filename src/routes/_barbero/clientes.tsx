@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { clients, formatLastCut, LOYALTY_GOAL, REMINDER_DAYS, whatsappUrl, type Client } from "@/lib/clients-data";
 
-export const Route = createFileRoute("/clientes")({
+export const Route = createFileRoute("/_barbero/clientes")({
   head: () => ({ meta: [{ title: "Clientes — Navaja" }, { name: "description", content: "Directorio de clientes de Navaja." }, { property: "og:title", content: "Clientes — Navaja" }, { property: "og:description", content: "Directorio de clientes de Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: ClientsPage,
 });

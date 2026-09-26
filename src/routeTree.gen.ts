@@ -9,39 +9,60 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as BarberoRouteImport } from './routes/_barbero'
+import { Route as IngresarRouteImport } from './routes/ingresar'
+import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as BarberoIndexRouteImport } from './routes/_barbero/index'
 import { Route as BarberoAjustesRouteImport } from './routes/_barbero/ajustes'
 import { Route as BarberoCajaRouteImport } from './routes/_barbero/caja'
 import { Route as BarberoClientesRouteImport } from './routes/_barbero/clientes'
 
-const BarberoIndexRoute = BarberoIndexRouteImport.update({
-  id: '/_barbero/',
-  path: '/',
+const BarberoRoute = BarberoRouteImport.update({
+  id: '/_barbero',
   getParentRoute: () => rootRouteImport,
+} as any)
+const IngresarRoute = IngresarRouteImport.update({
+  id: '/ingresar',
+  path: '/ingresar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReservarRoute = ReservarRouteImport.update({
+  id: '/reservar',
+  path: '/reservar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BarberoIndexRoute = BarberoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BarberoRoute,
 } as any)
 const BarberoAjustesRoute = BarberoAjustesRouteImport.update({
-  id: '/_barbero/ajustes',
+  id: '/ajustes',
   path: '/ajustes',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => BarberoRoute,
 } as any)
 const BarberoCajaRoute = BarberoCajaRouteImport.update({
-  id: '/_barbero/caja',
+  id: '/caja',
   path: '/caja',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => BarberoRoute,
 } as any)
 const BarberoClientesRoute = BarberoClientesRouteImport.update({
-  id: '/_barbero/clientes',
+  id: '/clientes',
   path: '/clientes',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => BarberoRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof BarberoIndexRoute
+  '/ingresar': typeof IngresarRoute
+  '/reservar': typeof ReservarRoute
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
-  '/': typeof BarberoIndexRoute
 }
 export interface FileRoutesByTo {
+  '/ingresar': typeof IngresarRoute
+  '/reservar': typeof ReservarRoute
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
@@ -49,6 +70,9 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_barbero': typeof BarberoRouteWithChildren
+  '/ingresar': typeof IngresarRoute
+  '/reservar': typeof ReservarRoute
   '/_barbero/ajustes': typeof BarberoAjustesRoute
   '/_barbero/caja': typeof BarberoCajaRoute
   '/_barbero/clientes': typeof BarberoClientesRoute
@@ -56,11 +80,15 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/ajustes' | '/caja' | '/clientes' | '/'
+  fullPaths:
+    '/' | '/ingresar' | '/reservar' | '/ajustes' | '/caja' | '/clientes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/ajustes' | '/caja' | '/clientes' | '/'
+  to: '/ingresar' | '/reservar' | '/ajustes' | '/caja' | '/clientes' | '/'
   id:
     | '__root__'
+    | '/_barbero'
+    | '/ingresar'
+    | '/reservar'
     | '/_barbero/ajustes'
     | '/_barbero/caja'
     | '/_barbero/clientes'
@@ -68,50 +96,86 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  BarberoAjustesRoute: typeof BarberoAjustesRoute
-  BarberoCajaRoute: typeof BarberoCajaRoute
-  BarberoClientesRoute: typeof BarberoClientesRoute
-  BarberoIndexRoute: typeof BarberoIndexRoute
+  BarberoRoute: typeof BarberoRouteWithChildren
+  IngresarRoute: typeof IngresarRoute
+  ReservarRoute: typeof ReservarRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_barbero': {
+      id: '/_barbero'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof BarberoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ingresar': {
+      id: '/ingresar'
+      path: '/ingresar'
+      fullPath: '/ingresar'
+      preLoaderRoute: typeof IngresarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reservar': {
+      id: '/reservar'
+      path: '/reservar'
+      fullPath: '/reservar'
+      preLoaderRoute: typeof ReservarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_barbero/': {
       id: '/_barbero/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof BarberoIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof BarberoRoute
     }
     '/_barbero/ajustes': {
       id: '/_barbero/ajustes'
       path: '/ajustes'
       fullPath: '/ajustes'
       preLoaderRoute: typeof BarberoAjustesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof BarberoRoute
     }
     '/_barbero/caja': {
       id: '/_barbero/caja'
       path: '/caja'
       fullPath: '/caja'
       preLoaderRoute: typeof BarberoCajaRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof BarberoRoute
     }
     '/_barbero/clientes': {
       id: '/_barbero/clientes'
       path: '/clientes'
       fullPath: '/clientes'
       preLoaderRoute: typeof BarberoClientesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof BarberoRoute
     }
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
+interface BarberoRouteChildren {
+  BarberoAjustesRoute: typeof BarberoAjustesRoute
+  BarberoCajaRoute: typeof BarberoCajaRoute
+  BarberoClientesRoute: typeof BarberoClientesRoute
+  BarberoIndexRoute: typeof BarberoIndexRoute
+}
+
+const BarberoRouteChildren: BarberoRouteChildren = {
   BarberoAjustesRoute: BarberoAjustesRoute,
   BarberoCajaRoute: BarberoCajaRoute,
   BarberoClientesRoute: BarberoClientesRoute,
   BarberoIndexRoute: BarberoIndexRoute,
+}
+
+const BarberoRouteWithChildren =
+  BarberoRoute._addFileChildren(BarberoRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  BarberoRoute: BarberoRouteWithChildren,
+  IngresarRoute: IngresarRoute,
+  ReservarRoute: ReservarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

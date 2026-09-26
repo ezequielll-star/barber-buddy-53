@@ -9,104 +9,109 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AjustesRouteImport } from './routes/ajustes'
-import { Route as CajaRouteImport } from './routes/caja'
-import { Route as ClientesRouteImport } from './routes/clientes'
+import { Route as BarberoIndexRouteImport } from './routes/_barbero/index'
+import { Route as BarberoAjustesRouteImport } from './routes/_barbero/ajustes'
+import { Route as BarberoCajaRouteImport } from './routes/_barbero/caja'
+import { Route as BarberoClientesRouteImport } from './routes/_barbero/clientes'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
+const BarberoIndexRoute = BarberoIndexRouteImport.update({
+  id: '/_barbero/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AjustesRoute = AjustesRouteImport.update({
-  id: '/ajustes',
+const BarberoAjustesRoute = BarberoAjustesRouteImport.update({
+  id: '/_barbero/ajustes',
   path: '/ajustes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CajaRoute = CajaRouteImport.update({
-  id: '/caja',
+const BarberoCajaRoute = BarberoCajaRouteImport.update({
+  id: '/_barbero/caja',
   path: '/caja',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientesRoute = ClientesRouteImport.update({
-  id: '/clientes',
+const BarberoClientesRoute = BarberoClientesRouteImport.update({
+  id: '/_barbero/clientes',
   path: '/clientes',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/ajustes': typeof AjustesRoute
-  '/caja': typeof CajaRoute
-  '/clientes': typeof ClientesRoute
+  '/ajustes': typeof BarberoAjustesRoute
+  '/caja': typeof BarberoCajaRoute
+  '/clientes': typeof BarberoClientesRoute
+  '/': typeof BarberoIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/ajustes': typeof AjustesRoute
-  '/caja': typeof CajaRoute
-  '/clientes': typeof ClientesRoute
+  '/ajustes': typeof BarberoAjustesRoute
+  '/caja': typeof BarberoCajaRoute
+  '/clientes': typeof BarberoClientesRoute
+  '/': typeof BarberoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/ajustes': typeof AjustesRoute
-  '/caja': typeof CajaRoute
-  '/clientes': typeof ClientesRoute
+  '/_barbero/ajustes': typeof BarberoAjustesRoute
+  '/_barbero/caja': typeof BarberoCajaRoute
+  '/_barbero/clientes': typeof BarberoClientesRoute
+  '/_barbero/': typeof BarberoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ajustes' | '/caja' | '/clientes'
+  fullPaths: '/ajustes' | '/caja' | '/clientes' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ajustes' | '/caja' | '/clientes'
-  id: '__root__' | '/' | '/ajustes' | '/caja' | '/clientes'
+  to: '/ajustes' | '/caja' | '/clientes' | '/'
+  id:
+    | '__root__'
+    | '/_barbero/ajustes'
+    | '/_barbero/caja'
+    | '/_barbero/clientes'
+    | '/_barbero/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AjustesRoute: typeof AjustesRoute
-  CajaRoute: typeof CajaRoute
-  ClientesRoute: typeof ClientesRoute
+  BarberoAjustesRoute: typeof BarberoAjustesRoute
+  BarberoCajaRoute: typeof BarberoCajaRoute
+  BarberoClientesRoute: typeof BarberoClientesRoute
+  BarberoIndexRoute: typeof BarberoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_barbero/': {
+      id: '/_barbero/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof BarberoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/ajustes': {
-      id: '/ajustes'
+    '/_barbero/ajustes': {
+      id: '/_barbero/ajustes'
       path: '/ajustes'
       fullPath: '/ajustes'
-      preLoaderRoute: typeof AjustesRouteImport
+      preLoaderRoute: typeof BarberoAjustesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/caja': {
-      id: '/caja'
+    '/_barbero/caja': {
+      id: '/_barbero/caja'
       path: '/caja'
       fullPath: '/caja'
-      preLoaderRoute: typeof CajaRouteImport
+      preLoaderRoute: typeof BarberoCajaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clientes': {
-      id: '/clientes'
+    '/_barbero/clientes': {
+      id: '/_barbero/clientes'
       path: '/clientes'
       fullPath: '/clientes'
-      preLoaderRoute: typeof ClientesRouteImport
+      preLoaderRoute: typeof BarberoClientesRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AjustesRoute: AjustesRoute,
-  CajaRoute: CajaRoute,
-  ClientesRoute: ClientesRoute,
+  BarberoAjustesRoute: BarberoAjustesRoute,
+  BarberoCajaRoute: BarberoCajaRoute,
+  BarberoClientesRoute: BarberoClientesRoute,
+  BarberoIndexRoute: BarberoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

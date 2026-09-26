@@ -5,7 +5,7 @@ import { PaymentDialog, openPaymentDialog } from "@/components/payment-dialog";
 import { Button } from "@/components/ui/button";
 import { getIncomes, methodCopy, money, type PaymentMethod } from "@/lib/cash-store";
 
-export const Route = createFileRoute("/caja")({
+export const Route = createFileRoute("/_barbero/caja")({
   head: () => ({ meta: [{ title: "Caja — Navaja" }, { name: "description", content: "Resumen diario de caja: efectivo, transferencia y tarjeta." }, { property: "og:title", content: "Caja — Navaja" }, { property: "og:description", content: "Resumen diario de caja: efectivo, transferencia y tarjeta." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: CashPage,
 });

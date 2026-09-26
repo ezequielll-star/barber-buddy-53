@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Bell, ChevronRight, Clock3, Settings, Store } from "lucide-react";
 import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 
-export const Route = createFileRoute("/ajustes")({
+export const Route = createFileRoute("/_barbero/ajustes")({
   head: () => ({ meta: [{ title: "Ajustes — Navaja" }, { name: "description", content: "Preferencias de la aplicación Navaja." }, { property: "og:title", content: "Ajustes — Navaja" }, { property: "og:description", content: "Preferencias de la aplicación Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: SettingsPage,
 });

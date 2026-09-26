@@ -10,7 +10,7 @@ import { PaymentDialog, openPaymentDialog } from "@/components/payment-dialog";
 import { servicePrices } from "@/lib/cash-store";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_barbero/")({
   head: () => ({
     meta: [
       { title: "Navaja — Turnos de hoy" },

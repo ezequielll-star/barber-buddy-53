@@ -102,13 +102,13 @@ function mountOnline(root: HTMLElement | null) {
     try {
       const rows = await listBookings({ data: { date } });
       root.querySelector("[data-online-count]")!.textContent = `${rows.length} ${rows.length === 1 ? "reserva" : "reservas"}`;
-      if (!rows.length) { list.innerHTML = '<li class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Todavía no hay reservas online para hoy.</li>'; return; }
+      if (!rows.length) { list.innerHTML = '<li class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Todavía no hay reservas online próximas.</li>'; return; }
       list.replaceChildren(...rows.map((r) => {
         const li = document.createElement("li");
         li.className = "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-primary/40 bg-card p-4";
         const t = document.createElement("time"); t.className = "text-lg font-extrabold tabular-nums text-primary"; t.textContent = r.booking_time;
         const info = document.createElement("div"); info.className = "min-w-0";
-        const tag = document.createElement("span"); tag.className = "mb-1 inline-block rounded bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary"; tag.textContent = "Reserva online";
+        const tag = document.createElement("span"); tag.className = "mb-1 inline-block rounded bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary"; tag.textContent = r.booking_date === date ? "Online · Hoy" : `Online · ${new Date(r.booking_date + "T12:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}`;
         const n = document.createElement("p"); n.className = "truncate font-bold"; n.textContent = r.client_name;
         const s = document.createElement("p"); s.className = "truncate text-sm text-muted-foreground"; s.textContent = r.service;
         info.append(tag, n, s);
@@ -164,7 +164,7 @@ function TodayPage() {
         </ol>
       </section>
       <section ref={mountOnline} aria-labelledby="online-title" className="mt-7">
-        <div className="mb-3 flex items-center justify-between"><h2 id="online-title" className="text-sm font-bold uppercase tracking-[0.14em]">Reservas online de hoy</h2><span data-online-count className="text-xs text-muted-foreground" /></div>
+        <div className="mb-3 flex items-center justify-between"><h2 id="online-title" className="text-sm font-bold uppercase tracking-[0.14em]">Reservas online</h2><span data-online-count className="text-xs text-muted-foreground" /></div>
         <ol data-online className="space-y-3"><li className="text-sm text-muted-foreground">Cargando…</li></ol>
       </section>
       <PaymentDialog id="payment-dialog" />

@@ -138,7 +138,7 @@ function TodayPage() {
     if (count) count.textContent = String(document.querySelectorAll('button[data-status="done"]').length);
     if (next === "done") {
       const concept = button.dataset["service"] ?? "";
-      openPaymentDialog("payment-dialog", { client: button.dataset["name"], concept, amount: servicePrices[concept] });
+      openPaymentDialog("payment-dialog", { client: button.dataset["name"] ?? "", concept, amount: servicePrices[concept] ?? 0 });
     }
   };
 

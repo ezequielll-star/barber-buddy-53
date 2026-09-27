@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_settings: {
+        Row: {
+          close_time: string
+          id: number
+          open_days: number[]
+          open_time: string
+          pin_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          close_time?: string
+          id?: number
+          open_days?: number[]
+          open_time?: string
+          pin_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          close_time?: string
+          id?: number
+          open_days?: number[]
+          open_time?: string
+          pin_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

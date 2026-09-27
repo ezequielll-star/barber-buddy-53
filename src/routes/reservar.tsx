@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Scissors } from "lucide-react";
-import { SERVICES, SLOTS, createBooking, getAvailability } from "@/lib/bookings.functions";
+import { SERVICES, createBooking, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/reservar")({
   head: () => ({ meta: [{ title: "Reservá tu turno — Navaja Barbería" }, { name: "description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:title", content: "Reservá tu turno — Navaja Barbería" }, { property: "og:description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -26,6 +26,7 @@ function mount(root: HTMLElement | null) {
     $("[data-summary]").textContent = [state["service"], state["dateLabel"], state["time"]].filter(Boolean).join(" · ") || "Elegí servicio, fecha y horario";
   };
 
+  let slots: string[] = [];
   const renderSlots = async () => {
     const box = $("[data-slots]");
     box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Cargando horarios…</p>';
@@ -33,7 +34,7 @@ function mount(root: HTMLElement | null) {
     const { taken } = await getAvailability({ data: { date: state["date"]! } });
     const today = iso(new Date());
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-    box.replaceChildren(...SLOTS.map((t) => {
+    box.replaceChildren(...slots.map((t) => {
       const [h, m] = t.split(":").map(Number);
       const busy = taken.includes(t) || (state["date"] === today && h! * 60 + m! <= nowMin);
       const b = document.createElement("button");
@@ -42,24 +43,31 @@ function mount(root: HTMLElement | null) {
       b.onclick = () => select("time", t);
       return b;
     }));
+    if (!slots.length) box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">No hay horarios configurados.</p>';
     select("time", "");
   };
 
-  const days = $("[data-days]");
-  const d = new Date();
-  for (let i = 0; days.children.length < 14 && i < 20; i++) {
-    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
-    if (day.getDay() === 0) continue;
-    const b = document.createElement("button");
-    const label = day.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
-    b.type = "button"; b.dataset["group"] = "date"; b.dataset["value"] = iso(day);
-    b.textContent = label;
-    b.onclick = () => { state["dateLabel"] = label; select("date", iso(day)); void renderSlots(); };
-    days.append(b);
-  }
   root.querySelectorAll<HTMLButtonElement>('[data-group="service"]').forEach((b) => (b.onclick = () => select("service", b.dataset["value"]!)));
-  (days.firstElementChild as HTMLButtonElement)?.click();
   select("service", "");
+  const days = $("[data-days]");
+  days.innerHTML = '<p class="text-sm text-muted-foreground">Cargando fechas…</p>';
+  void getSchedule().then((schedule) => {
+    slots = hourSlots(schedule.open, schedule.close);
+    days.replaceChildren();
+    const d = new Date();
+    for (let i = 0; days.children.length < 14 && i < 60; i++) {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+      if (!schedule.days.includes(day.getDay())) continue;
+      const b = document.createElement("button");
+      const label = day.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
+      b.type = "button"; b.dataset["group"] = "date"; b.dataset["value"] = iso(day);
+      b.textContent = label;
+      b.onclick = () => { state["dateLabel"] = label; select("date", iso(day)); void renderSlots(); };
+      days.append(b);
+    }
+    if (!days.children.length) { days.innerHTML = '<p class="text-sm text-muted-foreground">Por ahora no hay días de atención disponibles.</p>'; return; }
+    (days.firstElementChild as HTMLButtonElement).click();
+  });
 
   $("[data-form]").addEventListener("submit", async (e) => {
     e.preventDefault();

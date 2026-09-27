@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 export const SERVICES = [
@@ -116,12 +116,15 @@ export const createBooking = createServerFn({ method: "POST" })
     z.object({
       service: z.enum(SERVICES.map((s) => s.name) as [string, ...string[]]),
       date: dateSchema,
-      time: z.enum(SLOTS as [string, ...string[]]),
+      time: timeSchema,
       name: z.string().trim().min(2).max(80),
       whatsapp: z.string().trim().regex(/^\+?[0-9 ]{8,20}$/),
     }).parse(d),
   )
   .handler(async ({ data }) => {
+    const { open, close, days } = await readSettings();
+    const day = new Date(`${data.date}T12:00:00Z`).getUTCDay();
+    if (!days.includes(day) || !hourSlots(open, close).includes(data.time)) return { ok: false, message: "Ese horario no está disponible." };
     const db = await admin();
     const { error } = await db.from("bookings").insert({ service: data.service, booking_date: data.date, booking_time: data.time, client_name: data.name, whatsapp: data.whatsapp.replace(/\D/g, "") });
     if (error) return { ok: false, message: error.code === "23505" ? "Ese horario acaba de ocuparse. Elegí otro." : "No se pudo guardar la reserva." };

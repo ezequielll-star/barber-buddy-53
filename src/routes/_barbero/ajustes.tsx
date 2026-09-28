@@ -11,6 +11,7 @@ export const Route = createFileRoute("/_barbero/ajustes")({
 
 const input = "h-12 w-full rounded-md border border-input bg-background px-3 text-base";
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const HOURS_24 = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
 
 function mountSchedule(form: HTMLFormElement | null) {
   if (!form || form.dataset["ready"]) return;

@@ -35,6 +35,7 @@ function mountSchedule(form: HTMLFormElement | null) {
     refresh();
   });
   form.addEventListener("input", refresh);
+  form.addEventListener("change", refresh);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -73,8 +74,16 @@ function SettingsPage() {
     <form ref={mountSchedule} className="space-y-4 rounded-lg border border-border bg-card p-4">
       <h2 className="flex items-center gap-2 font-bold"><Clock3 className="size-5 text-primary" />Horario de atención</h2>
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm text-muted-foreground">Apertura<input name="open" type="time" step={1800} defaultValue="09:00" className={`${input} mt-1 text-foreground`} /></label>
-        <label className="text-sm text-muted-foreground">Cierre<input name="close" type="time" step={1800} defaultValue="19:00" className={`${input} mt-1 text-foreground`} /></label>
+        <label className="text-sm text-muted-foreground">Apertura
+          <select name="open" defaultValue="09:00" className={`${input} mt-1 appearance-none text-foreground`}>
+            {HOURS_24.map((h) => <option key={h} value={h}>{h}</option>)}
+          </select>
+        </label>
+        <label className="text-sm text-muted-foreground">Cierre
+          <select name="close" defaultValue="19:00" className={`${input} mt-1 appearance-none text-foreground`}>
+            {HOURS_24.map((h) => <option key={h} value={h}>{h}</option>)}
+          </select>
+        </label>
       </div>
       <p data-preview className="text-xs leading-5 text-muted-foreground" />
       <h3 className="pt-2 text-sm font-bold uppercase tracking-[0.14em]">Días de atención</h3>

@@ -28,7 +28,8 @@ const sessionConfig = () => ({
   password: process.env["SESSION_SECRET"]!,
   name: "navaja-barbero",
   maxAge: 60 * 60 * 24 * 30,
-  cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
+  // "none" + partitioned so the cookie also works when the app is embedded (editor preview iframe).
+  cookie: { httpOnly: true, secure: true, sameSite: "none" as const, partitioned: true, path: "/" },
 });
 
 async function isBarber() {

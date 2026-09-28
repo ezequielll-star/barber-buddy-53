@@ -73,7 +73,8 @@ function LoginPage() {
           </Button>
         ))}
       </div>
-      <Link to="/reservar" className="mt-10 text-center text-sm font-semibold text-primary">¿Sos cliente? Reservá tu turno</Link>
+      <Button type="button" onClick={enter} className="mt-4 h-14 w-full text-base font-bold">Entrar al panel</Button>
+      <Link to="/reservar" className="mt-8 text-center text-sm font-semibold text-primary">¿Sos cliente? Reservá tu turno</Link>
     </main>
   );
 }

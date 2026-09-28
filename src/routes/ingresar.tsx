@@ -8,25 +8,53 @@ export const Route = createFileRoute("/ingresar")({
   component: LoginPage,
 });
 
+function paintDots(root: HTMLElement, pin: string) {
+  root.querySelectorAll<HTMLElement>("[data-dot]").forEach((d, i) => d.classList.toggle("bg-primary", i < pin.length));
+}
+
+function submit(root: HTMLElement) {
+  const pin = root.dataset["pin"] ?? "";
+  const err = root.querySelector("[data-error]")!;
+  if (pin.length !== 4) {
+    err.textContent = "Ingresá los 4 dígitos";
+    return;
+  }
+  if (root.dataset["busy"]) return;
+  root.dataset["busy"] = "1";
+  err.textContent = "Verificando…";
+  loginBarber({ data: { pin } })
+    .then(({ ok }) => {
+      if (ok) {
+        window.location.assign("/");
+        return;
+      }
+      err.textContent = "Clave incorrecta";
+      root.dataset["pin"] = "";
+      paintDots(root, "");
+    })
+    .catch(() => {
+      err.textContent = "No se pudo verificar. Probá de nuevo.";
+    })
+    .finally(() => {
+      delete root.dataset["busy"];
+    });
+}
+
 function press(e: React.MouseEvent<HTMLButtonElement>) {
   const root = e.currentTarget.closest("[data-pin-root]") as HTMLElement;
   const key = e.currentTarget.dataset["key"]!;
+  if (root.dataset["busy"]) return;
   let pin = root.dataset["pin"] ?? "";
-  pin = key === "del" ? pin.slice(0, -1) : (pin + key).slice(0, 8);
+  pin = key === "del" ? pin.slice(0, -1) : (pin + key).slice(0, 4);
   root.dataset["pin"] = pin;
-  root.querySelectorAll<HTMLElement>("[data-dot]").forEach((d, i) => d.classList.toggle("bg-primary", i < pin.length));
-  const err = root.querySelector("[data-error]")!;
-  err.textContent = "";
-  if (pin.length === 4) {
-    loginBarber({ data: { pin } }).then(({ ok }) => {
-      if (ok) window.location.assign("/");
-      else {
-        err.textContent = "Clave incorrecta";
-        root.dataset["pin"] = "";
-        root.querySelectorAll<HTMLElement>("[data-dot]").forEach((d) => d.classList.remove("bg-primary"));
-      }
-    });
-  }
+  paintDots(root, pin);
+  root.querySelector("[data-error]")!.textContent = "";
+  if (pin.length === 4) submit(root);
+}
+
+function enter(e: React.MouseEvent<HTMLButtonElement>) {
+  const root = e.currentTarget.closest("[data-pin-root]") as HTMLElement;
+  submit(root);
 }
 
 function LoginPage() {

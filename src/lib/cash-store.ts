@@ -12,7 +12,7 @@ export const servicePrices: Record<string, number> = {
 };
 
 const KEY = "navaja-cash-v1";
-const seed: Income[] = [{ id: "seed-1", time: "09:45", concept: "Corte clásico", client: "Martín Acosta", amount: 8000, method: "cash" }];
+const seed: Income[] = [{ id: "seed-1", time: "09:45", concept: "Corte clásico", client: "Martín Acosta", amount: 8000, method: "cash", ref: "a:1" }];
 
 // Browser-only: call from handlers or ref callbacks, never at module scope.
 export function getIncomes(): Income[] {

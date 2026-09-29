@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { appointments, statusCopy, type Appointment, type AppointmentStatus } from "@/lib/barbershop-data";
 import { PaymentDialog, openPaymentDialog } from "@/components/payment-dialog";
-import { servicePrices } from "@/lib/cash-store";
+import { isPaid, servicePrices } from "@/lib/cash-store";
 import { cn } from "@/lib/utils";
 import { listBookings } from "@/lib/bookings.functions";
 
@@ -113,37 +113,71 @@ function mountOnline(root: HTMLElement | null) {
         const s = document.createElement("p"); s.className = "truncate text-sm text-muted-foreground"; s.textContent = r.service;
         info.append(tag, n, s);
         const wa = document.createElement("a"); wa.href = `https://wa.me/${r.whatsapp}`; wa.target = "_blank"; wa.rel = "noreferrer"; wa.className = "rounded-md border border-border px-3 py-2 text-xs font-bold"; wa.textContent = "WhatsApp";
-        li.append(t, info, wa);
+        const ref = `b:${r.id}`;
+        const paid = r.status === "done" || isPaid(ref);
+        const actions = document.createElement("div"); actions.className = "flex flex-col items-stretch gap-2";
+        if (paid) {
+          li.className = "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-success/40 bg-card p-4 opacity-70";
+          const b = document.createElement("span"); b.className = "rounded-md bg-success px-3 py-2 text-center text-xs font-bold text-success-foreground"; b.textContent = "✓ Cobrado";
+          actions.append(b);
+        } else {
+          const c = document.createElement("button"); c.type = "button"; c.className = "rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"; c.textContent = "Cobrar";
+          c.onclick = () => openPaymentDialog("payment-dialog", { client: r.client_name, concept: r.service, amount: servicePrices[r.service] ?? 0, ref });
+          actions.append(c, wa);
+        }
+        li.append(t, info, actions);
         return li;
       }));
     } catch { list.innerHTML = '<li class="text-sm text-destructive">No se pudieron cargar las reservas.</li>'; }
   };
   void load();
   const id = window.setInterval(load, 30000);
-  return () => window.clearInterval(id);
+  window.addEventListener("cash-updated", load);
+  return () => { window.clearInterval(id); window.removeEventListener("cash-updated", load); };
 }
 
 function TodayPage() {
   const completed = appointments.filter((appointment) => appointment.status === "done").length;
   const advanceStatus = (event: MouseEvent<HTMLButtonElement>) => {
     const button = event.currentTarget;
+    const ref = button.dataset["ref"] ?? "";
+    if (isPaid(ref) || button.dataset["status"] === "done") return;
     const current = (button.dataset["status"] ?? "pending") as AppointmentStatus;
-    const next: AppointmentStatus = current === "pending" ? "progress" : current === "progress" ? "done" : "pending";
-    const label = statusCopy[next];
-    const labelElement = button.querySelector("[data-status-label]");
-    if (labelElement) labelElement.textContent = label;
-    button.dataset["status"] = next;
-    button.className = cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", next === "pending" && "border border-border bg-surface-soft text-foreground", next === "progress" && "bg-primary text-primary-foreground", next === "done" && "bg-success text-success-foreground hover:bg-success/90");
-    const count = document.querySelector("[data-completed-count]");
-    if (count) count.textContent = String(document.querySelectorAll('button[data-status="done"]').length);
-    if (next === "done") {
-      const concept = button.dataset["service"] ?? "";
-      openPaymentDialog("payment-dialog", { client: button.dataset["name"] ?? "", concept, amount: servicePrices[concept] ?? 0 });
+    if (current === "pending") {
+      button.dataset["status"] = "progress";
+      button.querySelector("[data-status-label]")!.textContent = statusCopy.progress;
+      button.className = "mt-4 flex h-11 w-full items-center justify-between rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground";
+      return;
     }
+    // "En proceso" -> finalizar = cobrar. Only marked as done once the payment is saved.
+    const concept = button.dataset["service"] ?? "";
+    openPaymentDialog("payment-dialog", { client: button.dataset["name"] ?? "", concept, amount: servicePrices[concept] ?? 0, ref });
+  };
+  const syncPaid = (root: HTMLElement | null) => {
+    if (!root) return;
+    const apply = () => {
+      root.querySelectorAll<HTMLButtonElement>("button[data-ref]").forEach((button) => {
+        const done = button.dataset["status"] === "done" || isPaid(button.dataset["ref"] ?? "");
+        if (!done) return;
+        button.dataset["status"] = "done";
+        button.disabled = true;
+        button.querySelector("[data-status-label]")!.textContent = "✓ Finalizado · Cobrado";
+        button.className = "mt-4 flex h-11 w-full cursor-default items-center justify-between rounded-md bg-success px-4 text-sm font-bold text-success-foreground";
+        const li = button.closest("li");
+        if (li) li.className = "relative overflow-hidden rounded-lg border border-success/40 bg-card p-4 opacity-70";
+        li?.querySelector("[data-progress-bar]")?.remove();
+      });
+      const count = root.querySelector("[data-completed-count]");
+      if (count) count.textContent = String(root.querySelectorAll('button[data-ref][data-status="done"]').length);
+    };
+    apply();
+    window.addEventListener("cash-updated", apply);
+    return () => window.removeEventListener("cash-updated", apply);
   };
 
   return (
     <BarbershopShell active="today" action={<CalendarSheet />}>
+      <div ref={syncPaid}>
       <PageIntro eyebrow="Jueves, 24 de septiembre" title="Turnos de hoy" />
       <div className="mb-5 grid grid-cols-2 gap-3 border-y border-border py-4">
         <div><p className="text-2xl font-bold">{appointments.length}</p><p className="text-xs font-medium text-muted-foreground">Turnos agendados</p></div>
@@ -154,9 +188,9 @@ function TodayPage() {
         <ol className="space-y-3">
           {appointments.map((appointment) => (
             <li key={appointment.id} className={cn("relative overflow-hidden rounded-lg border bg-card p-4", appointment.status === "progress" ? "border-primary/60" : "border-border", appointment.status === "done" && "opacity-75")}>
-              {appointment.status === "progress" && <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
+              {appointment.status === "progress" && <span data-progress-bar className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
               <AppointmentSheet appointment={appointment} />
-              <Button type="button" variant={appointment.status === "pending" ? "outline" : "default"} onClick={advanceStatus} data-status={appointment.status} data-name={appointment.name} data-service={appointment.service} className={cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", appointment.status === "pending" && "border-border bg-surface-soft text-foreground", appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90")}>
+              <Button type="button" variant={appointment.status === "pending" ? "outline" : "default"} onClick={advanceStatus} data-status={appointment.status} data-ref={`a:${appointment.id}`} data-name={appointment.name} data-service={appointment.service} className={cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", appointment.status === "pending" && "border-border bg-surface-soft text-foreground", appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90")}>
                 <span data-status-label>{statusCopy[appointment.status]}</span><ChevronRight aria-hidden="true" className="size-4" />
               </Button>
             </li>
@@ -167,6 +201,7 @@ function TodayPage() {
         <div className="mb-3 flex items-center justify-between"><h2 id="online-title" className="text-sm font-bold uppercase tracking-[0.14em]">Reservas online</h2><span data-online-count className="text-xs text-muted-foreground" /></div>
         <ol data-online className="space-y-3"><li className="text-sm text-muted-foreground">Cargando…</li></ol>
       </section>
+      </div>
       <PaymentDialog id="payment-dialog" />
     </BarbershopShell>
   );

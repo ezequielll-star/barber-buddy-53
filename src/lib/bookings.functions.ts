@@ -141,3 +141,13 @@ export const listBookings = createServerFn({ method: "GET" })
     if (error) throw new Error("No se pudieron cargar las reservas");
     return rows ?? [];
   });
+
+export const markBookingPaid = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { data: row, error } = await db.from("bookings").update({ status: "done" }).eq("id", data.id).neq("status", "done").select("id").maybeSingle();
+    if (error) return { ok: false, message: "No se pudo actualizar la reserva." };
+    return row ? { ok: true, message: "" } : { ok: false, message: "Este turno ya fue cobrado." };
+  });

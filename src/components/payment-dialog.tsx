@@ -2,7 +2,8 @@ import type { FormEvent } from "react";
 import { Banknote, CreditCard, Landmark } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { addIncome, type PaymentMethod } from "@/lib/cash-store";
+import { addIncome, isPaid, type PaymentMethod } from "@/lib/cash-store";
+import { markBookingPaid } from "@/lib/bookings.functions";
 
 const methods = [
   { value: "cash", label: "Efectivo", icon: Banknote },
@@ -10,13 +11,18 @@ const methods = [
   { value: "card", label: "Tarjeta", icon: CreditCard },
 ] as const;
 
-export function openPaymentDialog(id: string, data: { client?: string; concept?: string; amount?: number }) {
+export function openPaymentDialog(id: string, data: { client?: string; concept?: string; amount?: number; ref?: string }) {
   const dialog = document.getElementById(id) as HTMLDialogElement | null;
   if (!dialog) return;
+  if (data.ref && isPaid(data.ref)) return;
   const form = dialog.querySelector("form")!;
   form.reset();
   dialog.dataset["client"] = data.client ?? "";
   dialog.dataset["concept"] = data.concept ?? "";
+  dialog.dataset["ref"] = data.ref ?? "";
+  dialog.dataset["busy"] = "";
+  const err = dialog.querySelector("[data-payment-error]");
+  if (err) err.textContent = "";
   const subtitle = dialog.querySelector("[data-payment-subtitle]");
   if (subtitle) subtitle.textContent = data.client ? `${data.client} · ${data.concept}` : "Cliente sin turno asignado";
   const amount = form.elements.namedItem("amount") as HTMLInputElement;
@@ -27,15 +33,27 @@ export function openPaymentDialog(id: string, data: { client?: string; concept?:
 
 export function PaymentDialog({ id, manual = false }: { id: string; manual?: boolean }) {
   const close = () => (document.getElementById(id) as HTMLDialogElement | null)?.close();
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const dialog = document.getElementById(id) as HTMLDialogElement;
+    if (dialog.dataset["busy"]) return;
     const fd = new FormData(event.currentTarget);
     const amount = Math.round(Number(fd.get("amount")));
     if (!Number.isFinite(amount) || amount <= 0 || amount > 10_000_000) return;
     const concept = manual ? String(fd.get("concept") ?? "").trim().slice(0, 60) || "Ingreso manual" : dialog.dataset["concept"] || "Servicio";
     const client = manual ? String(fd.get("client") ?? "").trim().slice(0, 60) || "Sin turno" : dialog.dataset["client"] || "";
-    addIncome({ amount, concept, client, method: fd.get("method") as PaymentMethod });
+    const ref = dialog.dataset["ref"] || undefined;
+    const err = dialog.querySelector("[data-payment-error]")!;
+    if (ref && isPaid(ref)) { dialog.close(); return; }
+    dialog.dataset["busy"] = "1";
+    if (ref?.startsWith("b:")) {
+      try {
+        const res = await markBookingPaid({ data: { id: ref.slice(2) } });
+        if (!res.ok) { err.textContent = res.message; dialog.dataset["busy"] = ""; window.dispatchEvent(new Event("cash-updated")); return; }
+      } catch { err.textContent = "Sin conexión. Probá de nuevo."; dialog.dataset["busy"] = ""; return; }
+    }
+    addIncome({ amount, concept, client, method: fd.get("method") as PaymentMethod, ref });
+    dialog.dataset["busy"] = "";
     dialog.close();
   };
 
@@ -72,6 +90,7 @@ export function PaymentDialog({ id, manual = false }: { id: string; manual?: boo
             ))}
           </div>
         </fieldset>
+        <p data-payment-error role="alert" className="text-sm font-semibold text-destructive empty:hidden" />
         <div className="grid grid-cols-[auto_1fr] gap-3">
           <Button type="button" variant="outline" onClick={close} className="h-12 border-border px-5">Cancelar</Button>
           <Button type="submit" className="h-12 text-base font-bold">Guardar cobro</Button>

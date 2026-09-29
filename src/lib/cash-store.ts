@@ -1,6 +1,6 @@
 export type PaymentMethod = "cash" | "transfer" | "card";
 
-export type Income = { id: string; time: string; concept: string; client: string; amount: number; method: PaymentMethod; ref?: string };
+export type Income = { id: string; time: string; concept: string; client: string; amount: number; method: PaymentMethod; ref?: string | undefined };
 
 export const methodCopy: Record<PaymentMethod, string> = { cash: "Efectivo", transfer: "Transferencia", card: "Tarjeta" };
 

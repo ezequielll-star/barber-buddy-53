@@ -1,15 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { MouseEvent } from "react";
-import { CalendarDays, ChevronRight, Clock3, FileText, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, ChevronRight, Clock3, MessageCircle, UserRound } from "lucide-react";
+import { es } from "date-fns/locale";
 
 import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { appointments, statusCopy, type Appointment, type AppointmentStatus } from "@/lib/barbershop-data";
 import { PaymentDialog, openPaymentDialog } from "@/components/payment-dialog";
-import { isPaid, servicePrices } from "@/lib/cash-store";
+import { dayKey, isPaid, servicePrices } from "@/lib/cash-store";
+import { SERVICES, listBookings } from "@/lib/bookings.functions";
 import { cn } from "@/lib/utils";
-import { listBookings } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/_barbero/")({
   head: () => ({
@@ -25,18 +27,80 @@ export const Route = createFileRoute("/_barbero/")({
   component: TodayPage,
 });
 
-function AppointmentSheet({ appointment }: { appointment: Appointment }) {
+type Booking = Awaited<ReturnType<typeof listBookings>>[number];
+
+function formatLongDate(date: Date) {
+  const weekday = date.toLocaleDateString("es-AR", { weekday: "long" });
+  const rest = date.toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`;
+}
+
+function parseDayKey(key: string) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y!, m! - 1, d!);
+}
+
+function serviceDuration(service: string) {
+  return SERVICES.find((s) => s.name === service)?.duration ?? "—";
+}
+
+function DatePickerButton({ selected, onSelect }: { selected: Date; onSelect: (date: Date) => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button aria-label="Elegir fecha" title="Elegir fecha" variant="outline" size="icon" className="size-11 shrink-0 border-border bg-card text-foreground">
+          <CalendarDays aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto border-border bg-card p-0">
+        <Calendar
+          mode="single"
+          locale={es}
+          selected={selected}
+          defaultMonth={selected}
+          onSelect={(date) => {
+            if (!date) return;
+            onSelect(date);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function BookingSheet({ booking, todayKey }: { booking: Booking; todayKey: string }) {
+  const ref = `b:${booking.id}`;
+  const paid = booking.status === "done" || isPaid(ref);
+  const duration = serviceDuration(booking.service);
+  const isToday = booking.booking_date === todayKey;
+
+  const charge = () => {
+    openPaymentDialog("payment-dialog", {
+      client: booking.client_name,
+      concept: booking.service,
+      amount: servicePrices[booking.service] ?? 0,
+      ref,
+    });
+  };
+
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button type="button" variant="ghost" className="h-auto w-full justify-start whitespace-normal rounded-md p-0 text-left hover:bg-transparent" aria-label={`Ver detalles del turno de ${appointment.name}`}>
+        <Button type="button" variant="ghost" className="h-auto w-full justify-start whitespace-normal rounded-md p-0 text-left hover:bg-transparent" aria-label={`Ver detalles del turno de ${booking.client_name}`}>
           <div className="grid w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4">
-            <time className="text-lg font-extrabold tabular-nums text-primary">{appointment.time}</time>
+            <time className="text-lg font-extrabold tabular-nums text-primary">{booking.booking_time}</time>
             <div className="min-w-0">
-              <h3 className={cn("truncate text-base font-bold", appointment.status === "done" && "line-through")}>{appointment.name}</h3>
+              <h3 className={cn("truncate text-base font-bold", paid && "line-through")}>{booking.client_name}</h3>
               <div className="mt-1 flex min-w-0 items-center gap-2 text-sm font-normal text-muted-foreground">
-                <span className="truncate">{appointment.service}</span><span aria-hidden="true">·</span>
-                <span className="flex shrink-0 items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{appointment.duration}</span>
+                <span className="truncate">{booking.service}</span>
+                <span aria-hidden="true">·</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <Clock3 aria-hidden="true" className="size-3.5" />
+                  {duration}
+                </span>
               </div>
             </div>
             <ChevronRight aria-hidden="true" className="size-5 text-muted-foreground" />
@@ -45,163 +109,158 @@ function AppointmentSheet({ appointment }: { appointment: Appointment }) {
       </SheetTrigger>
       <SheetContent side="bottom" className="mx-auto max-h-[85dvh] max-w-xl overflow-y-auto rounded-t-lg border-border bg-card pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <SheetHeader className="pr-8 text-left">
-          <p className="text-sm font-bold tabular-nums text-primary">{appointment.time} · {appointment.duration}</p>
-          <SheetTitle className="text-2xl font-extrabold">{appointment.name}</SheetTitle>
-          <SheetDescription>{appointment.service}</SheetDescription>
+          <p className="text-sm font-bold tabular-nums text-primary">
+            {booking.booking_time} · {duration}
+          </p>
+          <SheetTitle className="text-2xl font-extrabold">{booking.client_name}</SheetTitle>
+          <SheetDescription>
+            {booking.service}
+            {!isToday && (
+              <>
+                {" · "}
+                {formatLongDate(parseDayKey(booking.booking_date))}
+              </>
+            )}
+          </SheetDescription>
         </SheetHeader>
         <div className="mt-6 space-y-5">
           <div className="grid grid-cols-[auto_1fr] gap-3 border-y border-border py-4">
             <UserRound className="mt-0.5 size-5 text-primary" aria-hidden="true" />
-            <div><p className="text-xs font-bold uppercase text-muted-foreground">Cliente</p><p className="mt-1 font-semibold">{appointment.name}</p></div>
+            <div>
+              <p className="text-xs font-bold uppercase text-muted-foreground">Cliente</p>
+              <p className="mt-1 font-semibold">{booking.client_name}</p>
+            </div>
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-3">
-            <FileText className="mt-0.5 size-5 text-primary" aria-hidden="true" />
-            <div><p className="text-xs font-bold uppercase text-muted-foreground">Notas</p><p className="mt-1 text-sm leading-6">{appointment.notes}</p></div>
+            <MessageCircle className="mt-0.5 size-5 text-primary" aria-hidden="true" />
+            <div>
+              <p className="text-xs font-bold uppercase text-muted-foreground">WhatsApp</p>
+              <a href={`https://wa.me/${booking.whatsapp}`} target="_blank" rel="noreferrer" className="mt-1 inline-block font-semibold text-primary underline-offset-2 hover:underline">
+                +{booking.whatsapp}
+              </a>
+            </div>
           </div>
           <div className="flex items-center justify-between rounded-md bg-surface-soft p-4">
-            <span className="text-sm text-muted-foreground">Estado actual</span>
-            <span className="font-bold text-primary">{statusCopy[appointment.status]}</span>
+            <span className="text-sm text-muted-foreground">Estado</span>
+            <span className={cn("font-bold", paid ? "text-success" : "text-primary")}>{paid ? "Cobrado" : "Pendiente"}</span>
           </div>
+          {paid ? (
+            <div className="flex h-12 items-center justify-center rounded-md bg-success px-4 text-sm font-bold text-success-foreground">✓ Cobrado</div>
+          ) : (
+            <Button type="button" onClick={charge} className="h-12 w-full text-base font-bold">
+              Cobrar turno
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>
   );
-}
-
-function CalendarSheet() {
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button aria-label="Ver calendario" title="Ver calendario" variant="outline" size="icon" className="size-11 shrink-0 border-border bg-card text-foreground">
-          <CalendarDays aria-hidden="true" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="mx-auto max-h-[85dvh] max-w-xl overflow-y-auto rounded-t-lg border-border bg-card pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <SheetHeader className="pr-8 text-left">
-          <SheetTitle className="text-2xl font-extrabold">Calendario</SheetTitle>
-          <SheetDescription>Jueves, 24 de septiembre · {appointments.length} turnos</SheetDescription>
-        </SheetHeader>
-        <div className="mt-6 grid grid-cols-7 gap-1 text-center text-sm">
-          {["L", "M", "M", "J", "V", "S", "D"].map((day, index) => <span key={`${day}-${index}`} className="py-2 text-xs font-bold text-muted-foreground">{day}</span>)}
-          {[21, 22, 23, 24, 25, 26, 27].map((day) => <span key={day} className={cn("grid aspect-square place-items-center rounded-md font-semibold", day === 24 ? "bg-primary text-primary-foreground" : "bg-surface-soft")}>{day}</span>)}
-        </div>
-        <div className="mt-6 space-y-2 border-t border-border pt-5">
-          {appointments.map((appointment) => <div key={appointment.id} className="flex items-center justify-between py-2"><span className="font-bold tabular-nums text-primary">{appointment.time}</span><span className="ml-4 flex-1 truncate text-right text-sm">{appointment.name}</span></div>)}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function mountOnline(root: HTMLElement | null) {
-  if (!root) return;
-  const load = async () => {
-    const d = new Date();
-    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const list = root.querySelector("[data-online]")!;
-    try {
-      const rows = await listBookings({ data: { date } });
-      root.querySelector("[data-online-count]")!.textContent = `${rows.length} ${rows.length === 1 ? "reserva" : "reservas"}`;
-      if (!rows.length) { list.innerHTML = '<li class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Todavía no hay reservas online para hoy.</li>'; return; }
-      list.replaceChildren(...rows.map((r) => {
-        const li = document.createElement("li");
-        li.className = "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-primary/40 bg-card p-4";
-        const t = document.createElement("time"); t.className = "text-lg font-extrabold tabular-nums text-primary"; t.textContent = r.booking_time;
-        const info = document.createElement("div"); info.className = "min-w-0";
-        const tag = document.createElement("span"); tag.className = "mb-1 inline-block rounded bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary"; tag.textContent = r.booking_date === date ? "Online · Hoy" : `Online · ${new Date(r.booking_date + "T12:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}`;
-        const n = document.createElement("p"); n.className = "truncate font-bold"; n.textContent = r.client_name;
-        const s = document.createElement("p"); s.className = "truncate text-sm text-muted-foreground"; s.textContent = r.service;
-        info.append(tag, n, s);
-        const wa = document.createElement("a"); wa.href = `https://wa.me/${r.whatsapp}`; wa.target = "_blank"; wa.rel = "noreferrer"; wa.className = "rounded-md border border-border px-3 py-2 text-xs font-bold"; wa.textContent = "WhatsApp";
-        const ref = `b:${r.id}`;
-        const paid = r.status === "done" || isPaid(ref);
-        const actions = document.createElement("div"); actions.className = "flex flex-col items-stretch gap-2";
-        if (paid) {
-          li.className = "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-success/40 bg-card p-4 opacity-70";
-          const b = document.createElement("span"); b.className = "rounded-md bg-success px-3 py-2 text-center text-xs font-bold text-success-foreground"; b.textContent = "✓ Cobrado";
-          actions.append(b);
-        } else {
-          const c = document.createElement("button"); c.type = "button"; c.className = "rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"; c.textContent = "Cobrar";
-          c.onclick = () => openPaymentDialog("payment-dialog", { client: r.client_name, concept: r.service, amount: servicePrices[r.service] ?? 0, ref });
-          actions.append(c, wa);
-        }
-        li.append(t, info, actions);
-        return li;
-      }));
-    } catch { list.innerHTML = '<li class="text-sm text-destructive">No se pudieron cargar las reservas.</li>'; }
-  };
-  void load();
-  const id = window.setInterval(load, 30000);
-  window.addEventListener("cash-updated", load);
-  return () => { window.clearInterval(id); window.removeEventListener("cash-updated", load); };
 }
 
 function TodayPage() {
-  const completed = appointments.filter((appointment) => appointment.status === "done").length;
-  const advanceStatus = (event: MouseEvent<HTMLButtonElement>) => {
-    const button = event.currentTarget;
-    const ref = button.dataset["ref"] ?? "";
-    if (isPaid(ref) || button.dataset["status"] === "done") return;
-    const current = (button.dataset["status"] ?? "pending") as AppointmentStatus;
-    if (current === "pending") {
-      button.dataset["status"] = "progress";
-      button.querySelector("[data-status-label]")!.textContent = statusCopy.progress;
-      button.className = "mt-4 flex h-11 w-full items-center justify-between rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground";
-      return;
-    }
-    // "En proceso" -> finalizar = cobrar. Only marked as done once the payment is saved.
-    const concept = button.dataset["service"] ?? "";
-    openPaymentDialog("payment-dialog", { client: button.dataset["name"] ?? "", concept, amount: servicePrices[concept] ?? 0, ref });
-  };
-  const syncPaid = (root: HTMLElement | null) => {
-    if (!root) return;
-    const apply = () => {
-      root.querySelectorAll<HTMLButtonElement>("button[data-ref]").forEach((button) => {
-        const done = button.dataset["status"] === "done" || isPaid(button.dataset["ref"] ?? "");
-        if (!done) return;
-        button.dataset["status"] = "done";
-        button.disabled = true;
-        button.querySelector("[data-status-label]")!.textContent = "✓ Finalizado · Cobrado";
-        button.className = "mt-4 flex h-11 w-full cursor-default items-center justify-between rounded-md bg-success px-4 text-sm font-bold text-success-foreground";
-        const li = button.closest("li");
-        if (li) li.className = "relative overflow-hidden rounded-lg border border-success/40 bg-card p-4 opacity-70";
-        li?.querySelector("[data-progress-bar]")?.remove();
-      });
-      const count = root.querySelector("[data-completed-count]");
-      if (count) count.textContent = String(root.querySelectorAll('button[data-ref][data-status="done"]').length);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const selectedKey = dayKey(selectedDate);
+  const todayKey = dayKey();
+  const isToday = selectedKey === todayKey;
+  const completed = bookings.filter((b) => b.status === "done" || isPaid(`b:${b.id}`)).length;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(false);
+      try {
+        const rows = await listBookings({ data: { date: selectedKey } });
+        if (!cancelled) setBookings(rows);
+      } catch {
+        if (!cancelled) {
+          setBookings([]);
+          setError(true);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
-    apply();
-    window.addEventListener("cash-updated", apply);
-    return () => window.removeEventListener("cash-updated", apply);
-  };
+
+    void load();
+    const id = window.setInterval(load, 30_000);
+    const onCash = () => void load();
+    window.addEventListener("cash-updated", onCash);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("cash-updated", onCash);
+    };
+  }, [selectedKey]);
+
+  const emptyMessage = isToday ? "No hay turnos agendados para hoy" : "No hay turnos agendados para esta fecha";
 
   return (
-    <BarbershopShell active="today" action={<CalendarSheet />}>
-      <div ref={syncPaid}>
-      <PageIntro eyebrow="Jueves, 24 de septiembre" title="Turnos de hoy" />
+    <BarbershopShell active="today" action={<DatePickerButton selected={selectedDate} onSelect={setSelectedDate} />}>
+      <PageIntro eyebrow={formatLongDate(selectedDate)} title={isToday ? "Turnos de hoy" : "Turnos del día"} />
       <div className="mb-5 grid grid-cols-2 gap-3 border-y border-border py-4">
-        <div><p className="text-2xl font-bold">{appointments.length}</p><p className="text-xs font-medium text-muted-foreground">Turnos agendados</p></div>
-        <div className="border-l border-border pl-4"><p data-completed-count className="text-2xl font-bold text-primary">{completed}</p><p className="text-xs font-medium text-muted-foreground">Finalizados</p></div>
+        <div>
+          <p className="text-2xl font-bold">{loading ? "—" : bookings.length}</p>
+          <p className="text-xs font-medium text-muted-foreground">Turnos agendados</p>
+        </div>
+        <div className="border-l border-border pl-4">
+          <p className="text-2xl font-bold text-primary">{loading ? "—" : completed}</p>
+          <p className="text-xs font-medium text-muted-foreground">Finalizados</p>
+        </div>
       </div>
       <section aria-labelledby="agenda-title">
-        <div className="mb-3 flex items-center justify-between"><h2 id="agenda-title" className="text-sm font-bold uppercase tracking-[0.14em]">Agenda</h2><span className="text-xs text-muted-foreground">Tocá un turno para ver más</span></div>
-        <ol className="space-y-3">
-          {appointments.map((appointment) => (
-            <li key={appointment.id} className={cn("relative overflow-hidden rounded-lg border bg-card p-4", appointment.status === "progress" ? "border-primary/60" : "border-border", appointment.status === "done" && "opacity-75")}>
-              {appointment.status === "progress" && <span data-progress-bar className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
-              <AppointmentSheet appointment={appointment} />
-              <Button type="button" variant={appointment.status === "pending" ? "outline" : "default"} onClick={advanceStatus} data-status={appointment.status} data-ref={`a:${appointment.id}`} data-name={appointment.name} data-service={appointment.service} className={cn("mt-4 h-11 w-full justify-between px-4 text-sm font-bold", appointment.status === "pending" && "border-border bg-surface-soft text-foreground", appointment.status === "done" && "bg-success text-success-foreground hover:bg-success/90")}>
-                <span data-status-label>{statusCopy[appointment.status]}</span><ChevronRight aria-hidden="true" className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ol>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 id="agenda-title" className="text-sm font-bold uppercase tracking-[0.14em]">
+            Agenda
+          </h2>
+          <span className="text-xs text-muted-foreground">Tocá un turno para ver más</span>
+        </div>
+        {loading ? (
+          <p className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Cargando turnos…</p>
+        ) : error ? (
+          <p className="rounded-lg border border-border bg-card p-4 text-sm text-destructive">No se pudieron cargar los turnos.</p>
+        ) : bookings.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border bg-card p-6 text-center text-sm font-medium text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          <ol className="space-y-3">
+            {bookings.map((booking) => {
+              const paid = booking.status === "done" || isPaid(`b:${booking.id}`);
+              return (
+                <li key={booking.id} className={cn("relative overflow-hidden rounded-lg border bg-card p-4", paid ? "border-success/40 opacity-75" : "border-border")}>
+                  <BookingSheet booking={booking} todayKey={todayKey} />
+                  {paid ? (
+                    <div className="mt-4 flex h-11 items-center justify-between rounded-md bg-success px-4 text-sm font-bold text-success-foreground">
+                      <span>✓ Cobrado</span>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="mt-4 h-11 w-full justify-between px-4 text-sm font-bold"
+                      onClick={() =>
+                        openPaymentDialog("payment-dialog", {
+                          client: booking.client_name,
+                          concept: booking.service,
+                          amount: servicePrices[booking.service] ?? 0,
+                          ref: `b:${booking.id}`,
+                        })
+                      }
+                    >
+                      <span>Cobrar</span>
+                      <ChevronRight aria-hidden="true" className="size-4" />
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </section>
-      <section ref={mountOnline} aria-labelledby="online-title" className="mt-7">
-        <div className="mb-3 flex items-center justify-between"><h2 id="online-title" className="text-sm font-bold uppercase tracking-[0.14em]">Reservas online</h2><span data-online-count className="text-xs text-muted-foreground" /></div>
-        <ol data-online className="space-y-3"><li className="text-sm text-muted-foreground">Cargando…</li></ol>
-      </section>
-      </div>
       <PaymentDialog id="payment-dialog" />
     </BarbershopShell>
   );

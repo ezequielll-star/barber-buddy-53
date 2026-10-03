@@ -102,7 +102,7 @@ function mountOnline(root: HTMLElement | null) {
     try {
       const rows = await listBookings({ data: { date } });
       root.querySelector("[data-online-count]")!.textContent = `${rows.length} ${rows.length === 1 ? "reserva" : "reservas"}`;
-      if (!rows.length) { list.innerHTML = '<li class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Todavía no hay reservas online próximas.</li>'; return; }
+      if (!rows.length) { list.innerHTML = '<li class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Todavía no hay reservas online para hoy.</li>'; return; }
       list.replaceChildren(...rows.map((r) => {
         const li = document.createElement("li");
         li.className = "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-primary/40 bg-card p-4";

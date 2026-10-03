@@ -137,7 +137,7 @@ export const listBookings = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     await requireBarber();
     const db = await admin();
-    const { data: rows, error } = await db.from("bookings").select("id, service, booking_date, booking_time, client_name, whatsapp, status").gte("booking_date", data.date).order("booking_date").order("booking_time").limit(50);
+    const { data: rows, error } = await db.from("bookings").select("id, service, booking_date, booking_time, client_name, whatsapp, status").eq("booking_date", data.date).order("booking_time").limit(50);
     if (error) throw new Error("No se pudieron cargar las reservas");
     return rows ?? [];
   });

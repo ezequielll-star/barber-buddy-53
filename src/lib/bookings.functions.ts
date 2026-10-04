@@ -127,7 +127,7 @@ async function dayLoad(date: string) {
 const barberSel = z.string().uuid().optional();
 
 export const getAvailability = createServerFn({ method: "GET" })
-  .inputValidator((d: { date: string; barberId?: string }) => z.object({ date: dateSchema, barberId: barberSel }).parse(d))
+  .inputValidator((d: { date: string; barberId?: string | undefined }) => z.object({ date: dateSchema, barberId: barberSel }).parse(d))
   .handler(async ({ data }) => {
     const { open, close } = await readSettings();
     const { freeAt } = await dayLoad(data.date);

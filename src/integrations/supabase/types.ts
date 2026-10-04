@@ -14,8 +14,31 @@ export type Database = {
   }
   public: {
     Tables: {
+      barbers: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
+          barber_id: string | null
+          barber_name: string | null
           booking_date: string
           booking_time: string
           client_name: string
@@ -26,6 +49,8 @@ export type Database = {
           whatsapp: string
         }
         Insert: {
+          barber_id?: string | null
+          barber_name?: string | null
           booking_date: string
           booking_time: string
           client_name: string
@@ -36,6 +61,8 @@ export type Database = {
           whatsapp: string
         }
         Update: {
+          barber_id?: string | null
+          barber_name?: string | null
           booking_date?: string
           booking_time?: string
           client_name?: string
@@ -45,7 +72,15 @@ export type Database = {
           status?: string
           whatsapp?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bookings_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "barbers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
@@ -85,6 +120,7 @@ export type Database = {
           open_time: string
           pin_hash: string | null
           updated_at: string
+          whatsapp: string
         }
         Insert: {
           close_time?: string
@@ -93,6 +129,7 @@ export type Database = {
           open_time?: string
           pin_hash?: string | null
           updated_at?: string
+          whatsapp?: string
         }
         Update: {
           close_time?: string
@@ -101,6 +138,7 @@ export type Database = {
           open_time?: string
           pin_hash?: string | null
           updated_at?: string
+          whatsapp?: string
         }
         Relationships: []
       }

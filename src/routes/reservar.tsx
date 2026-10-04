@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Scissors } from "lucide-react";
-import { SERVICES, createBooking, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
+import { createBooking, listServices, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/reservar")({
   head: () => ({ meta: [{ title: "Reservá tu turno — Navaja Barbería" }, { name: "description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:title", content: "Reservá tu turno — Navaja Barbería" }, { property: "og:description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -47,7 +47,24 @@ function mount(root: HTMLElement | null) {
     select("time", "");
   };
 
-  root.querySelectorAll<HTMLButtonElement>('[data-group="service"]').forEach((b) => (b.onclick = () => select("service", b.dataset["value"]!)));
+  const svcBox = $("[data-services]");
+  svcBox.innerHTML = '<p class="text-sm text-muted-foreground">Cargando servicios…</p>';
+  void listServices().then((list) => {
+    if (!list.length) { svcBox.innerHTML = '<p class="text-sm text-muted-foreground">Por ahora no hay servicios disponibles.</p>'; return; }
+    svcBox.replaceChildren(...list.map((s) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset["group"] = "service"; b.dataset["value"] = s.name;
+      const wrap = document.createElement("span"); wrap.className = "flex items-center justify-between gap-3 py-2";
+      const left = document.createElement("span"); left.className = "text-left";
+      const n = document.createElement("span"); n.className = "block text-base font-bold"; n.textContent = s.name;
+      const meta = document.createElement("span"); meta.className = "block text-xs opacity-75"; meta.textContent = `${s.duration_min} min${s.description ? " · " + s.description : ""}`;
+      const price = document.createElement("span"); price.className = "shrink-0 font-bold"; price.textContent = `$ ${s.price.toLocaleString("es-AR")}`;
+      left.append(n, meta); wrap.append(left, price); b.append(wrap);
+      b.onclick = () => select("service", s.name);
+      return b;
+    }));
+    select("service", "");
+  }).catch(() => { svcBox.innerHTML = '<p class="text-sm text-destructive">No se pudieron cargar los servicios.</p>'; });
   select("service", "");
   const days = $("[data-days]");
   days.innerHTML = '<p class="text-sm text-muted-foreground">Cargando fechas…</p>';
@@ -103,13 +120,7 @@ function BookingPage() {
       <div data-flow>
         <h1 className="pb-5 pt-6 text-4xl font-extrabold leading-tight">Reservá tu turno</h1>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em]">1. Servicio</h2>
-        <div className="grid gap-2">
-          {SERVICES.map((s) => (
-            <button key={s.name} type="button" data-group="service" data-value={s.name} className={chip}>
-              <span className="flex items-center justify-between py-2"><span className="text-left"><span className="block text-base font-bold">{s.name}</span><span className="block text-xs opacity-75">{s.duration}</span></span><span className="font-bold">$ {s.price.toLocaleString("es-AR")}</span></span>
-            </button>
-          ))}
-        </div>
+        <div data-services className="grid gap-2" />
         <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">2. Fecha</h2>
         <div data-days className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 [&>button]:shrink-0 [&>button]:capitalize" />
         <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">3. Horario</h2>

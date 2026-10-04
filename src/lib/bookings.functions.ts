@@ -115,7 +115,7 @@ export const getAvailability = createServerFn({ method: "GET" })
 export const createBooking = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({
-      service: z.enum(SERVICES.map((s) => s.name) as [string, ...string[]]),
+      service: z.string().trim().min(1).max(80),
       date: dateSchema,
       time: timeSchema,
       name: z.string().trim().min(2).max(80),
@@ -127,6 +127,8 @@ export const createBooking = createServerFn({ method: "POST" })
     const day = new Date(`${data.date}T12:00:00Z`).getUTCDay();
     if (!days.includes(day) || !hourSlots(open, close).includes(data.time)) return { ok: false, message: "Ese horario no está disponible." };
     const db = await admin();
+    const { data: svc } = await db.from("services").select("id").eq("name", data.service).eq("active", true).limit(1).maybeSingle();
+    if (!svc) return { ok: false, message: "Ese servicio ya no está disponible." };
     const { error } = await db.from("bookings").insert({ service: data.service, booking_date: data.date, booking_time: data.time, client_name: data.name, whatsapp: data.whatsapp.replace(/\D/g, "") });
     if (error) return { ok: false, message: error.code === "23505" ? "Ese horario acaba de ocuparse. Elegí otro." : "No se pudo guardar la reserva." };
     return { ok: true, message: "" };
@@ -150,4 +152,48 @@ export const markBookingPaid = createServerFn({ method: "POST" })
     const { data: row, error } = await db.from("bookings").update({ status: "done" }).eq("id", data.id).neq("status", "done").select("id").maybeSingle();
     if (error) return { ok: false, message: "No se pudo actualizar la reserva." };
     return row ? { ok: true, message: "" } : { ok: false, message: "Este turno ya fue cobrado." };
+  });
+
+export type Service = { id: string; name: string; price: number; duration_min: number; description: string; active: boolean };
+const SVC_COLS = "id, name, price, duration_min, description, active";
+
+export const listServices = createServerFn({ method: "GET" }).handler(async (): Promise<Service[]> => {
+  const db = await admin();
+  const { data, error } = await db.from("services").select(SVC_COLS).eq("active", true).order("price");
+  if (error) throw new Error("No se pudieron cargar los servicios");
+  return data ?? [];
+});
+
+export const listAllServices = createServerFn({ method: "GET" }).handler(async (): Promise<Service[]> => {
+  await requireBarber();
+  const db = await admin();
+  const { data, error } = await db.from("services").select(SVC_COLS).order("created_at");
+  if (error) throw new Error("No se pudieron cargar los servicios");
+  return data ?? [];
+});
+
+export const saveService = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(2).max(80),
+    price: z.number().int().min(0).max(10_000_000),
+    duration_min: z.number().int().min(5).max(480),
+    description: z.string().trim().max(300),
+    active: z.boolean(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { id, ...row } = data;
+    const { error } = id ? await db.from("services").update(row).eq("id", id) : await db.from("services").insert(row);
+    return error ? { ok: false, message: "No se pudo guardar el servicio." } : { ok: true, message: "" };
+  });
+
+export const deleteService = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { error } = await db.from("services").delete().eq("id", data.id);
+    return error ? { ok: false, message: "No se pudo eliminar." } : { ok: true, message: "" };
   });

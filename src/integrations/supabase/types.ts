@@ -47,6 +47,36 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          duration_min: number
+          id: string
+          name: string
+          price: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          duration_min?: number
+          id?: string
+          name: string
+          price?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          duration_min?: number
+          id?: string
+          name?: string
+          price?: number
+        }
+        Relationships: []
+      }
       shop_settings: {
         Row: {
           close_time: string

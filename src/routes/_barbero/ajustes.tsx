@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Clock3, KeyRound, Link2, LogOut, Settings, Store } from "lucide-react";
+import { Bell, Clock3, Scissors, KeyRound, Link2, LogOut, Settings, Store } from "lucide-react";
 import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 import { Button } from "@/components/ui/button";
-import { DAY_NAMES, changePin, getSchedule, hourSlots, logoutBarber, saveSchedule } from "@/lib/bookings.functions";
+import { DAY_NAMES, type Service, changePin, deleteService, listAllServices, saveService, getSchedule, hourSlots, logoutBarber, saveSchedule } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/_barbero/ajustes")({
   head: () => ({ meta: [{ title: "Ajustes — Navaja" }, { name: "description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:title", content: "Ajustes — Navaja" }, { property: "og:description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -67,6 +67,66 @@ function mountPin(form: HTMLFormElement | null) {
   });
 }
 
+function mountServices(root: HTMLElement | null) {
+  if (!root || root.dataset["ready"]) return;
+  root.dataset["ready"] = "1";
+  const list = root.querySelector<HTMLElement>("[data-list]")!;
+  const form = root.querySelector<HTMLFormElement>("form")!;
+  const msg = form.querySelector<HTMLElement>("[data-msg]")!;
+  const title = form.querySelector<HTMLElement>("[data-title]")!;
+  const cancel = form.querySelector<HTMLButtonElement>("[data-cancel]")!;
+  const f = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+  const say = (t: string, ok = false) => { msg.textContent = t; msg.className = `min-h-5 text-sm font-semibold ${ok ? "text-primary" : "text-destructive"}`; };
+  const fill = (s?: Service) => {
+    f("id").value = s?.id ?? ""; f("name").value = s?.name ?? ""; f("price").value = s ? String(s.price) : "";
+    f("duration").value = s ? String(s.duration_min) : "60"; f("description").value = s?.description ?? ""; f("active").checked = s?.active ?? true;
+    title.textContent = s ? `Editar: ${s.name}` : "Agregar nuevo servicio"; cancel.hidden = !s;
+  };
+  const load = async () => {
+    list.innerHTML = '<p class="p-4 text-sm text-muted-foreground">Cargando servicios…</p>';
+    const items = await listAllServices().catch(() => null);
+    if (!items) { list.innerHTML = '<p class="p-4 text-sm text-destructive">No se pudieron cargar.</p>'; return; }
+    if (!items.length) { list.innerHTML = '<p class="p-4 text-sm text-muted-foreground">Todavía no hay servicios.</p>'; return; }
+    list.replaceChildren(...items.map((s, i) => {
+      const row = document.createElement("div");
+      row.className = `flex items-center gap-3 p-3 ${i ? "border-t border-border" : ""} ${s.active ? "" : "opacity-50"}`;
+      const info = document.createElement("div"); info.className = "min-w-0 flex-1";
+      const n = document.createElement("p"); n.className = "truncate font-bold"; n.textContent = s.name + (s.active ? "" : " (oculto)");
+      const m = document.createElement("p"); m.className = "truncate text-sm text-muted-foreground"; m.textContent = `$ ${s.price.toLocaleString("es-AR")} · ${s.duration_min} min${s.description ? " · " + s.description : ""}`;
+      info.append(n, m);
+      const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Editar";
+      edit.className = "h-11 rounded-md border border-border px-3 text-sm font-bold";
+      edit.onclick = () => { fill(s); say(""); form.scrollIntoView({ behavior: "smooth", block: "center" }); };
+      const del = document.createElement("button"); del.type = "button"; del.textContent = "Eliminar";
+      del.className = "h-11 rounded-md border border-destructive/50 px-3 text-sm font-bold text-destructive";
+      del.onclick = async () => {
+        if (!window.confirm(`¿Eliminar "${s.name}"?`)) return;
+        const r = await deleteService({ data: { id: s.id } }).catch(() => ({ ok: false, message: "No se pudo eliminar." }));
+        if (!r.ok) return say(r.message);
+        if (f("id").value === s.id) fill();
+        void load();
+      };
+      row.append(info, edit, del);
+      return row;
+    }));
+  };
+  cancel.onclick = () => { fill(); say(""); };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const price = Number(f("price").value), duration = Number(f("duration").value);
+    if (f("name").value.trim().length < 2) return say("Ingresá el nombre del servicio.");
+    if (!Number.isInteger(price) || price < 0) return say("Ingresá un precio válido (solo números).");
+    if (!Number.isInteger(duration) || duration < 5 || duration > 480) return say("La duración debe ser entre 5 y 480 minutos.");
+    say("Guardando…", true);
+    const r = await saveService({ data: { id: f("id").value || undefined, name: f("name").value, price, duration_min: duration, description: f("description").value, active: f("active").checked } }).catch(() => ({ ok: false, message: "No se pudo guardar el servicio." }));
+    if (!r.ok) return say(r.message);
+    fill(); say("Servicio guardado. Ya se ve en la página de reservas.", true);
+    void load();
+  });
+  fill();
+  void load();
+}
+
 function SettingsPage() {
   return <BarbershopShell active="settings" action={<div className="grid size-11 place-items-center rounded-md border border-border bg-card text-primary"><Settings className="size-5" /></div>}>
     <PageIntro eyebrow="Preferencias" title="Ajustes" description="Horarios, días de atención y acceso al panel." />
@@ -99,6 +159,25 @@ function SettingsPage() {
       <p data-msg role="status" className="min-h-5 text-sm font-semibold" />
       <Button type="submit" className="h-12 w-full text-base font-bold">Guardar horarios</Button>
     </form>
+
+    <section ref={mountServices} className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 font-bold"><Scissors className="size-5 text-primary" />Gestión de Servicios y Precios</h2>
+      <div data-list className="overflow-hidden rounded-md border border-border bg-surface-soft" />
+      <form className="space-y-3 pt-2">
+        <h3 data-title className="text-sm font-bold uppercase tracking-[0.14em]">Agregar nuevo servicio</h3>
+        <input type="hidden" name="id" />
+        <input name="name" maxLength={80} placeholder="Nombre (ej: Corte clásico)" aria-label="Nombre" className={input} />
+        <div className="grid grid-cols-2 gap-3">
+          <input name="price" type="number" inputMode="numeric" min={0} placeholder="Precio ($)" aria-label="Precio" className={input} />
+          <input name="duration" type="number" inputMode="numeric" min={5} max={480} step={5} placeholder="Duración (min)" aria-label="Duración en minutos" className={input} />
+        </div>
+        <textarea name="description" maxLength={300} rows={2} placeholder="Descripción (opcional)" aria-label="Descripción" className="w-full rounded-md border border-input bg-background px-3 py-2 text-base" />
+        <label className="flex min-h-12 items-center gap-3"><input type="checkbox" name="active" className="size-5 accent-primary" /><span className="font-semibold">Visible en la página de reservas</span></label>
+        <p data-msg role="status" className="min-h-5 text-sm font-semibold" />
+        <Button type="submit" className="h-12 w-full text-base font-bold">Guardar servicio</Button>
+        <Button type="button" variant="outline" data-cancel hidden className="h-12 w-full text-base font-bold">Cancelar edición</Button>
+      </form>
+    </section>
 
     <form ref={mountPin} className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
       <h2 className="flex items-center gap-2 font-bold"><KeyRound className="size-5 text-primary" />Cambiar PIN de acceso</h2>

@@ -33,7 +33,7 @@ function mountSchedule(form: HTMLFormElement | null) {
     (form.elements.namedItem("close") as HTMLInputElement).value = s.close;
     form.querySelectorAll<HTMLInputElement>("input[name=day]").forEach((c) => (c.checked = s.days.includes(Number(c.value))));
     refresh();
-  });
+  }).catch(() => { msg.textContent = "No se pudieron cargar los horarios. Recargá la página."; msg.className = "min-h-5 text-sm font-semibold text-destructive"; });
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.addEventListener("submit", async (e) => {

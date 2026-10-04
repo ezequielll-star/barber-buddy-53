@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Scissors } from "lucide-react";
-import { createBooking, listServices, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
+import { createBooking, getPublicInfo, listServices, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/reservar")({
   head: () => ({ meta: [{ title: "Reservá tu turno — Navaja Barbería" }, { name: "description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:title", content: "Reservá tu turno — Navaja Barbería" }, { property: "og:description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -23,7 +23,7 @@ function mount(root: HTMLElement | null) {
     root.querySelectorAll<HTMLButtonElement>(`[data-group="${group}"]`).forEach((b) => {
       b.className = `${chip} ${b.dataset["value"] === value ? chipOn : ""} ${b.disabled ? "cursor-not-allowed opacity-40 line-through" : ""}`;
     });
-    $("[data-summary]").textContent = [state["service"], state["dateLabel"], state["time"]].filter(Boolean).join(" · ") || "Elegí servicio, fecha y horario";
+    $("[data-summary]").textContent = [state["service"], state["barberLabel"], state["dateLabel"], state["time"]].filter(Boolean).join(" · ") || "Elegí servicio, fecha y horario";
   };
 
   let slots: string[] = [];
@@ -31,7 +31,7 @@ function mount(root: HTMLElement | null) {
     const box = $("[data-slots]");
     box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Cargando horarios…</p>';
     delete state["time"];
-    const { taken } = await getAvailability({ data: { date: state["date"]! } });
+    const { taken } = await getAvailability({ data: { date: state["date"]!, barberId: state["barber"] || undefined } });
     const today = iso(new Date());
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     box.replaceChildren(...slots.map((t) => {
@@ -66,6 +66,21 @@ function mount(root: HTMLElement | null) {
     select("service", "");
   }).catch(() => { svcBox.innerHTML = '<p class="text-sm text-destructive">No se pudieron cargar los servicios.</p>'; });
   select("service", "");
+  let shopWa = "";
+  void getPublicInfo().then(({ whatsapp, barbers }) => {
+    shopWa = whatsapp;
+    if (!barbers.length) return;
+    const box = $("[data-barbers]");
+    $("[data-barber-section]").hidden = false;
+    const opts = [{ id: "", name: "Cualquier barbero disponible" }, ...barbers];
+    box.replaceChildren(...opts.map((o) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset["group"] = "barber"; b.dataset["value"] = o.id; b.textContent = o.name;
+      b.onclick = () => { state["barberLabel"] = o.id ? `con ${o.name}` : ""; select("barber", o.id); if (state["date"]) void renderSlots(); };
+      return b;
+    }));
+    select("barber", "");
+  }).catch(() => {});
   const days = $("[data-days]");
   days.innerHTML = '<p class="text-sm text-muted-foreground">Cargando fechas…</p>';
   void getSchedule().then((schedule) => {
@@ -100,11 +115,18 @@ function mount(root: HTMLElement | null) {
     const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
     btn.disabled = true; btn.textContent = "Reservando…";
     try {
-      const res = await createBooking({ data: { service: state["service"], date: state["date"], time: state["time"], name, whatsapp } });
+      const res = await createBooking({ data: { service: state["service"], date: state["date"], time: state["time"], barberId: state["barber"] || undefined, name, whatsapp } });
       if (!res.ok) { err.textContent = res.message; void renderSlots(); return; }
       $("[data-flow]").hidden = true;
       $("[data-done]").hidden = false;
-      $("[data-done-text]").textContent = `${state["service"]} · ${state["dateLabel"]} · ${state["time"]}`;
+      const who = res.barberName ? ` con ${res.barberName}` : "";
+      $("[data-done-text]").textContent = `${state["service"]}${who} · ${state["dateLabel"]} · ${state["time"]}`;
+      const wa = $<HTMLAnchorElement>("[data-wa]");
+      if (shopWa) {
+        const text = `Hola! Acabo de reservar para ${state["service"]}${who} el ${state["dateLabel"]} a las ${state["time"]} y quisiera hacer una consulta.`;
+        wa.href = `https://wa.me/${shopWa}?text=${encodeURIComponent(text)}`;
+        wa.hidden = false;
+      }
     } catch { err.textContent = "Revisá los datos e intentá de nuevo."; }
     finally { btn.disabled = false; btn.textContent = "Confirmar reserva"; }
   });
@@ -121,6 +143,10 @@ function BookingPage() {
         <h1 className="pb-5 pt-6 text-4xl font-extrabold leading-tight">Reservá tu turno</h1>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em]">1. Servicio</h2>
         <div data-services className="grid gap-2" />
+        <div data-barber-section hidden>
+          <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">Barbero</h2>
+          <div data-barbers className="grid grid-cols-2 gap-2 [&>button:first-child]:col-span-2" />
+        </div>
         <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">2. Fecha</h2>
         <div data-days className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 [&>button]:shrink-0 [&>button]:capitalize" />
         <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">3. Horario</h2>
@@ -137,6 +163,11 @@ function BookingPage() {
         <h1 className="text-3xl font-extrabold">¡Reserva confirmada!</h1>
         <p data-done-text className="mt-3 font-semibold text-primary" />
         <p className="mt-2 text-sm text-muted-foreground">Te esperamos. Si necesitás cambiarla, escribinos por WhatsApp.</p>
+        <a data-wa hidden target="_blank" rel="noreferrer" className="mt-6 inline-flex h-14 items-center justify-center gap-2 rounded-md bg-whatsapp px-6 text-base font-bold text-whatsapp-foreground">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="size-6 fill-current"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35M12.05 21.79h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88a9.82 9.82 0 0 1 6.99 2.9 9.82 9.82 0 0 1 2.89 6.99c0 5.45-4.44 9.88-9.88 9.88m8.41-18.29A11.82 11.82 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.68 1.45h.01c6.55 0 11.89-5.34 11.89-11.89 0-3.18-1.24-6.16-3.48-8.41"/></svg>
+          Escribinos por WhatsApp
+        </a>
+        <br />
         <a href="/reservar" className="mt-8 inline-flex h-12 items-center rounded-md border border-border px-5 font-semibold">Hacer otra reserva</a>
       </div>
     </main>

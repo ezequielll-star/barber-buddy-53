@@ -46,9 +46,9 @@ const hashPin = (pin: string) => createHmac("sha256", process.env["SESSION_SECRE
 
 async function readSettings() {
   const db = await admin();
-  const { data, error } = await db.from("shop_settings").select("open_time, close_time, open_days, pin_hash").eq("id", 1).maybeSingle();
+  const { data, error } = await db.from("shop_settings").select("open_time, close_time, open_days, pin_hash, whatsapp").eq("id", 1).maybeSingle();
   if (error) throw new Error("No se pudieron cargar los ajustes");
-  return { open: data?.open_time ?? "09:00", close: data?.close_time ?? "19:00", days: data?.open_days ?? [1, 2, 3, 4, 5, 6], pinHash: data?.pin_hash ?? null };
+  return { open: data?.open_time ?? "09:00", close: data?.close_time ?? "19:00", days: data?.open_days ?? [1, 2, 3, 4, 5, 6], pinHash: data?.pin_hash ?? null, whatsapp: data?.whatsapp ?? "" };
 }
 
 export const checkBarber = createServerFn({ method: "GET" }).handler(async () => ({ ok: await isBarber() }));
@@ -103,13 +103,35 @@ export const logoutBarber = createServerFn({ method: "POST" }).handler(async () 
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** Which free barber ids remain at each time, given bookings of a day. null barber = blocks everyone. */
+async function dayLoad(date: string) {
+  const db = await admin();
+  const [{ data: rows, error }, { data: barbers }] = await Promise.all([
+    db.from("bookings").select("booking_time, barber_id").eq("booking_date", date),
+    db.from("barbers").select("id").eq("active", true),
+  ]);
+  if (error) throw new Error("No se pudo cargar la disponibilidad");
+  const ids = (barbers ?? []).map((b) => b.id);
+  const busy = new Map<string, Set<string | null>>();
+  for (const r of rows ?? []) { if (!busy.has(r.booking_time)) busy.set(r.booking_time, new Set()); busy.get(r.booking_time)!.add(r.barber_id); }
+  const freeAt = (time: string, barberId?: string): (string | null)[] => {
+    const b = busy.get(time);
+    if (b?.has(null)) return [];
+    if (!ids.length) return b?.size ? [] : [null];
+    const pool = barberId ? ids.filter((i) => i === barberId) : ids;
+    return pool.filter((i) => !b?.has(i));
+  };
+  return { freeAt };
+}
+
+const barberSel = z.string().uuid().optional();
+
 export const getAvailability = createServerFn({ method: "GET" })
-  .inputValidator((d: { date: string }) => z.object({ date: dateSchema }).parse(d))
+  .inputValidator((d: { date: string; barberId?: string }) => z.object({ date: dateSchema, barberId: barberSel }).parse(d))
   .handler(async ({ data }) => {
-    const db = await admin();
-    const { data: rows, error } = await db.from("bookings").select("booking_time").eq("booking_date", data.date);
-    if (error) throw new Error("No se pudo cargar la disponibilidad");
-    return { taken: (rows ?? []).map((r) => r.booking_time) };
+    const { open, close } = await readSettings();
+    const { freeAt } = await dayLoad(data.date);
+    return { taken: hourSlots(open, close).filter((t) => !freeAt(t, data.barberId).length) };
   });
 
 export const createBooking = createServerFn({ method: "POST" })
@@ -118,6 +140,7 @@ export const createBooking = createServerFn({ method: "POST" })
       service: z.string().trim().min(1).max(80),
       date: dateSchema,
       time: timeSchema,
+      barberId: barberSel,
       name: z.string().trim().min(2).max(80),
       whatsapp: z.string().trim().regex(/^\+?[0-9 ]{8,20}$/),
     }).parse(d),
@@ -129,9 +152,14 @@ export const createBooking = createServerFn({ method: "POST" })
     const db = await admin();
     const { data: svc } = await db.from("services").select("id").eq("name", data.service).eq("active", true).limit(1).maybeSingle();
     if (!svc) return { ok: false, message: "Ese servicio ya no está disponible." };
-    const { error } = await db.from("bookings").insert({ service: data.service, booking_date: data.date, booking_time: data.time, client_name: data.name, whatsapp: data.whatsapp.replace(/\D/g, "") });
+    const free = (await dayLoad(data.date)).freeAt(data.time, data.barberId);
+    if (!free.length) return { ok: false, message: "Ese horario acaba de ocuparse. Elegí otro." };
+    const barberId = free[0] ?? null;
+    let barberName: string | null = null;
+    if (barberId) barberName = (await db.from("barbers").select("name").eq("id", barberId).maybeSingle()).data?.name ?? null;
+    const { error } = await db.from("bookings").insert({ service: data.service, booking_date: data.date, booking_time: data.time, barber_id: barberId, barber_name: barberName, client_name: data.name, whatsapp: data.whatsapp.replace(/\D/g, "") });
     if (error) return { ok: false, message: error.code === "23505" ? "Ese horario acaba de ocuparse. Elegí otro." : "No se pudo guardar la reserva." };
-    return { ok: true, message: "" };
+    return { ok: true, message: "", barberName };
   });
 
 export const listBookings = createServerFn({ method: "GET" })
@@ -139,7 +167,7 @@ export const listBookings = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     await requireBarber();
     const db = await admin();
-    const { data: rows, error } = await db.from("bookings").select("id, service, booking_date, booking_time, client_name, whatsapp, status").eq("booking_date", data.date).order("booking_time").limit(50);
+    const { data: rows, error } = await db.from("bookings").select("id, service, booking_date, booking_time, client_name, whatsapp, status, barber_name").eq("booking_date", data.date).order("booking_time").limit(50);
     if (error) throw new Error("No se pudieron cargar las reservas");
     return rows ?? [];
   });
@@ -195,5 +223,54 @@ export const deleteService = createServerFn({ method: "POST" })
     await requireBarber();
     const db = await admin();
     const { error } = await db.from("services").delete().eq("id", data.id);
+    return error ? { ok: false, message: "No se pudo eliminar." } : { ok: true, message: "" };
+  });
+
+export type Barber = { id: string; name: string; active: boolean };
+
+export const getPublicInfo = createServerFn({ method: "GET" }).handler(async () => {
+  const db = await admin();
+  const [{ whatsapp }, { data }] = await Promise.all([readSettings(), db.from("barbers").select("id, name").eq("active", true).order("created_at")]);
+  return { whatsapp, barbers: data ?? [] };
+});
+
+export const getWhatsapp = createServerFn({ method: "GET" }).handler(async () => {
+  await requireBarber();
+  return { whatsapp: (await readSettings()).whatsapp };
+});
+
+export const saveWhatsapp = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ whatsapp: z.string().trim().regex(/^\+?[0-9 ]{0,20}$/) }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { error } = await db.from("shop_settings").update({ whatsapp: data.whatsapp.replace(/\D/g, ""), updated_at: new Date().toISOString() }).eq("id", 1);
+    return error ? { ok: false, message: "No se pudo guardar." } : { ok: true, message: "" };
+  });
+
+export const listAllBarbers = createServerFn({ method: "GET" }).handler(async (): Promise<Barber[]> => {
+  await requireBarber();
+  const db = await admin();
+  const { data, error } = await db.from("barbers").select("id, name, active").order("created_at");
+  if (error) throw new Error("No se pudieron cargar los barberos");
+  return data ?? [];
+});
+
+export const saveBarber = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(2).max(60), active: z.boolean() }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { id, ...row } = data;
+    const { error } = id ? await db.from("barbers").update(row).eq("id", id) : await db.from("barbers").insert(row);
+    return error ? { ok: false, message: "No se pudo guardar." } : { ok: true, message: "" };
+  });
+
+export const deleteBarber = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    await requireBarber();
+    const db = await admin();
+    const { error } = await db.from("barbers").delete().eq("id", data.id);
     return error ? { ok: false, message: "No se pudo eliminar." } : { ok: true, message: "" };
   });

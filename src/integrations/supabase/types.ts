@@ -17,21 +17,74 @@ export type Database = {
       barbers: {
         Row: {
           active: boolean
+          barbershop_id: string
           created_at: string
           id: string
           name: string
         }
         Insert: {
           active?: boolean
+          barbershop_id: string
           created_at?: string
           id?: string
           name: string
         }
         Update: {
           active?: boolean
+          barbershop_id?: string
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barbers_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: false
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barbershops: {
+        Row: {
+          address: string
+          close_time: string
+          created_at: string
+          id: string
+          logo_url: string
+          name: string
+          open_days: number[]
+          open_time: string
+          owner_id: string | null
+          phone_whatsapp: string
+          slug: string
+        }
+        Insert: {
+          address?: string
+          close_time?: string
+          created_at?: string
+          id?: string
+          logo_url?: string
+          name?: string
+          open_days?: number[]
+          open_time?: string
+          owner_id?: string | null
+          phone_whatsapp?: string
+          slug: string
+        }
+        Update: {
+          address?: string
+          close_time?: string
+          created_at?: string
+          id?: string
+          logo_url?: string
+          name?: string
+          open_days?: number[]
+          open_time?: string
+          owner_id?: string | null
+          phone_whatsapp?: string
+          slug?: string
         }
         Relationships: []
       }
@@ -39,6 +92,7 @@ export type Database = {
         Row: {
           barber_id: string | null
           barber_name: string | null
+          barbershop_id: string
           booking_date: string
           booking_time: string
           client_name: string
@@ -51,6 +105,7 @@ export type Database = {
         Insert: {
           barber_id?: string | null
           barber_name?: string | null
+          barbershop_id: string
           booking_date: string
           booking_time: string
           client_name: string
@@ -63,6 +118,7 @@ export type Database = {
         Update: {
           barber_id?: string | null
           barber_name?: string | null
+          barbershop_id?: string
           booking_date?: string
           booking_time?: string
           client_name?: string
@@ -80,11 +136,60 @@ export type Database = {
             referencedRelation: "barbers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bookings_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: false
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          barbershop_id: string
+          created_at: string
+          id: string
+          last_visit: string | null
+          name: string
+          notes: string
+          phone: string
+          visits: number
+        }
+        Insert: {
+          barbershop_id: string
+          created_at?: string
+          id?: string
+          last_visit?: string | null
+          name: string
+          notes?: string
+          phone: string
+          visits?: number
+        }
+        Update: {
+          barbershop_id?: string
+          created_at?: string
+          id?: string
+          last_visit?: string | null
+          name?: string
+          notes?: string
+          phone?: string
+          visits?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: false
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
         ]
       }
       services: {
         Row: {
           active: boolean
+          barbershop_id: string
           created_at: string
           description: string
           duration_min: number
@@ -94,6 +199,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          barbershop_id: string
           created_at?: string
           description?: string
           duration_min?: number
@@ -103,6 +209,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          barbershop_id?: string
           created_at?: string
           description?: string
           duration_min?: number
@@ -110,7 +217,15 @@ export type Database = {
           name?: string
           price?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "services_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: false
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shop_settings: {
         Row: {
@@ -147,7 +262,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_shop_owner: { Args: { _shop: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

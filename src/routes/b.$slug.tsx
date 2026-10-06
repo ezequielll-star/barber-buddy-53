@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Scissors } from "lucide-react";
-import { createBooking, getPublicInfo, listServices, getAvailability, getSchedule, hourSlots } from "@/lib/bookings.functions";
+import { createBooking, getPublicShop, getAvailability, hourSlots } from "@/lib/bookings.functions";
 
-export const Route = createFileRoute("/reservar")({
+export const Route = createFileRoute("/b/$slug")({
   head: () => ({ meta: [{ title: "Reservá tu turno — Navaja Barbería" }, { name: "description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:title", content: "Reservá tu turno — Navaja Barbería" }, { property: "og:description", content: "Elegí servicio, fecha y horario y reservá tu turno en Navaja en segundos." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: BookingPage,
 });
@@ -16,6 +16,8 @@ function mount(root: HTMLElement | null) {
   if (!root || root.dataset["ready"]) return;
   root.dataset["ready"] = "1";
   const state: Record<string, string> = {};
+  const slug = root.dataset["slug"]!;
+  const info = getPublicShop({ data: { slug } });
   const $ = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
 
   const select = (group: string, value: string) => {
@@ -31,7 +33,7 @@ function mount(root: HTMLElement | null) {
     const box = $("[data-slots]");
     box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Cargando horarios…</p>';
     delete state["time"];
-    const { taken } = await getAvailability({ data: { date: state["date"]!, barberId: state["barber"] || undefined } });
+    const { taken } = await getAvailability({ data: { slug, date: state["date"]!, barberId: state["barber"] || undefined } });
     const today = iso(new Date());
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     box.replaceChildren(...slots.map((t) => {
@@ -49,7 +51,7 @@ function mount(root: HTMLElement | null) {
 
   const svcBox = $("[data-services]");
   svcBox.innerHTML = '<p class="text-sm text-muted-foreground">Cargando servicios…</p>';
-  void listServices().then((list) => {
+  void info.then((d) => { const list = d?.services ?? [];
     if (!list.length) { svcBox.innerHTML = '<p class="text-sm text-muted-foreground">Por ahora no hay servicios disponibles.</p>'; return; }
     svcBox.replaceChildren(...list.map((s) => {
       const b = document.createElement("button");
@@ -67,7 +69,7 @@ function mount(root: HTMLElement | null) {
   }).catch(() => { svcBox.innerHTML = '<p class="text-sm text-destructive">No se pudieron cargar los servicios.</p>'; });
   select("service", "");
   let shopWa = "";
-  void getPublicInfo().then(({ whatsapp, barbers }) => {
+  void info.then((d) => { if (!d) return; const whatsapp = d.shop.whatsapp; const barbers = d.barbers; const nameEl = root.querySelector("[data-shop-name]"); if (nameEl) nameEl.textContent = d.shop.name;
     shopWa = whatsapp;
     if (!barbers.length) return;
     const box = $("[data-barbers]");
@@ -83,7 +85,7 @@ function mount(root: HTMLElement | null) {
   }).catch(() => {});
   const days = $("[data-days]");
   days.innerHTML = '<p class="text-sm text-muted-foreground">Cargando fechas…</p>';
-  void getSchedule().then((schedule) => {
+  void info.then((d) => { if (!d) { days.innerHTML = '<p class="text-sm text-destructive">Esta barbería no existe.</p>'; return; } const schedule = d.schedule;
     slots = hourSlots(schedule.open, schedule.close);
     days.replaceChildren();
     const d = new Date();
@@ -115,7 +117,7 @@ function mount(root: HTMLElement | null) {
     const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
     btn.disabled = true; btn.textContent = "Reservando…";
     try {
-      const res = await createBooking({ data: { service: state["service"], date: state["date"], time: state["time"], barberId: state["barber"] || undefined, name, whatsapp } });
+      const res = await createBooking({ data: { slug, service: state["service"], date: state["date"], time: state["time"], barberId: state["barber"] || undefined, name, whatsapp } });
       if (!res.ok) { err.textContent = res.message; void renderSlots(); return; }
       $("[data-flow]").hidden = true;
       $("[data-done]").hidden = false;
@@ -134,10 +136,10 @@ function mount(root: HTMLElement | null) {
 
 function BookingPage() {
   return (
-    <main ref={mount} className="mx-auto min-h-dvh w-full max-w-md px-5 pb-12 pt-[max(1.25rem,env(safe-area-inset-top))] text-foreground md:max-w-xl">
+    <main ref={mount} data-slug={Route.useParams().slug} className="mx-auto min-h-dvh w-full max-w-md px-5 pb-12 pt-[max(1.25rem,env(safe-area-inset-top))] text-foreground md:max-w-xl">
       <header className="flex items-center gap-3 py-3">
         <div className="grid size-11 place-items-center rounded-md border border-primary/35 bg-primary/10 text-primary"><Scissors className="size-5" /></div>
-        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Navaja</p><p className="text-sm text-muted-foreground">Barbería & estudio</p></div>
+        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary"><span data-shop-name>Barbería</span></p><p className="text-sm text-muted-foreground">Barbería & estudio</p></div>
       </header>
       <div data-flow>
         <h1 className="pb-5 pt-6 text-4xl font-extrabold leading-tight">Reservá tu turno</h1>
@@ -168,7 +170,7 @@ function BookingPage() {
           Escribinos por WhatsApp
         </a>
         <br />
-        <a href="/reservar" className="mt-8 inline-flex h-12 items-center rounded-md border border-border px-5 font-semibold">Hacer otra reserva</a>
+        <a href="" className="mt-8 inline-flex h-12 items-center rounded-md border border-border px-5 font-semibold">Hacer otra reserva</a>
       </div>
     </main>
   );

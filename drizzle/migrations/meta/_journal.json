@@ -15,6 +15,13 @@
       "when": 1791079065223,
       "tag": "0001_barbers_and_whatsapp",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791312985151,
+      "tag": "0002_multi_tenant_barbershops",
+      "breakpoints": true
     }
   ]
 }

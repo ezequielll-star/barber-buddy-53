@@ -11,11 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as BarberoRouteImport } from './routes/_barbero'
 import { Route as IngresarRouteImport } from './routes/ingresar'
-import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as BarberoIndexRouteImport } from './routes/_barbero/index'
 import { Route as BarberoAjustesRouteImport } from './routes/_barbero/ajustes'
 import { Route as BarberoCajaRouteImport } from './routes/_barbero/caja'
 import { Route as BarberoClientesRouteImport } from './routes/_barbero/clientes'
+import { Route as BSlugRouteImport } from './routes/b.$slug'
 
 const BarberoRoute = BarberoRouteImport.update({
   id: '/_barbero',
@@ -24,11 +24,6 @@ const BarberoRoute = BarberoRouteImport.update({
 const IngresarRoute = IngresarRouteImport.update({
   id: '/ingresar',
   path: '/ingresar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReservarRoute = ReservarRouteImport.update({
-  id: '/reservar',
-  path: '/reservar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BarberoIndexRoute = BarberoIndexRouteImport.update({
@@ -51,54 +46,58 @@ const BarberoClientesRoute = BarberoClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => BarberoRoute,
 } as any)
+const BSlugRoute = BSlugRouteImport.update({
+  id: '/b/$slug',
+  path: '/b/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof BarberoIndexRoute
   '/ingresar': typeof IngresarRoute
-  '/reservar': typeof ReservarRoute
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
+  '/b/$slug': typeof BSlugRoute
 }
 export interface FileRoutesByTo {
   '/ingresar': typeof IngresarRoute
-  '/reservar': typeof ReservarRoute
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
+  '/b/$slug': typeof BSlugRoute
   '/': typeof BarberoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_barbero': typeof BarberoRouteWithChildren
   '/ingresar': typeof IngresarRoute
-  '/reservar': typeof ReservarRoute
   '/_barbero/ajustes': typeof BarberoAjustesRoute
   '/_barbero/caja': typeof BarberoCajaRoute
   '/_barbero/clientes': typeof BarberoClientesRoute
+  '/b/$slug': typeof BSlugRoute
   '/_barbero/': typeof BarberoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    '/' | '/ingresar' | '/reservar' | '/ajustes' | '/caja' | '/clientes'
+  fullPaths: '/' | '/ingresar' | '/ajustes' | '/caja' | '/clientes' | '/b/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/ingresar' | '/reservar' | '/ajustes' | '/caja' | '/clientes' | '/'
+  to: '/ingresar' | '/ajustes' | '/caja' | '/clientes' | '/b/$slug' | '/'
   id:
     | '__root__'
     | '/_barbero'
     | '/ingresar'
-    | '/reservar'
     | '/_barbero/ajustes'
     | '/_barbero/caja'
     | '/_barbero/clientes'
+    | '/b/$slug'
     | '/_barbero/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   BarberoRoute: typeof BarberoRouteWithChildren
   IngresarRoute: typeof IngresarRoute
-  ReservarRoute: typeof ReservarRoute
+  BSlugRoute: typeof BSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -115,13 +114,6 @@ declare module '@tanstack/react-router' {
       path: '/ingresar'
       fullPath: '/ingresar'
       preLoaderRoute: typeof IngresarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reservar': {
-      id: '/reservar'
-      path: '/reservar'
-      fullPath: '/reservar'
-      preLoaderRoute: typeof ReservarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_barbero/': {
@@ -152,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BarberoClientesRouteImport
       parentRoute: typeof BarberoRoute
     }
+    '/b/$slug': {
+      id: '/b/$slug'
+      path: '/b/$slug'
+      fullPath: '/b/$slug'
+      preLoaderRoute: typeof BSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -175,7 +174,7 @@ const BarberoRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   BarberoRoute: BarberoRouteWithChildren,
   IngresarRoute: IngresarRoute,
-  ReservarRoute: ReservarRoute,
+  BSlugRoute: BSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

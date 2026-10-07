@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Clock3, Scissors, KeyRound, Link2, LogOut, Settings, Store } from "lucide-react";
+import { Bell, Clock3, Scissors, Link2, LogOut, Settings, Store } from "lucide-react";
 import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 import { Button } from "@/components/ui/button";
-import { DAY_NAMES, type Service, changePin, deleteService, listAllServices, saveService, getSchedule, hourSlots, logoutBarber, saveSchedule } from "@/lib/bookings.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { DAY_NAMES, type Service, deleteService, getMyShop, saveMyShop, listAllServices, saveService, getSchedule, hourSlots, saveSchedule } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/_barbero/ajustes")({
   head: () => ({ meta: [{ title: "Ajustes — Navaja" }, { name: "description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:title", content: "Ajustes — Navaja" }, { property: "og:description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -47,23 +48,23 @@ function mountSchedule(form: HTMLFormElement | null) {
   });
 }
 
-function mountPin(form: HTMLFormElement | null) {
+function mountShop(form: HTMLFormElement | null) {
   if (!form || form.dataset["ready"]) return;
   form.dataset["ready"] = "1";
+  const msg = form.querySelector<HTMLElement>("[data-msg]")!;
+  const f = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+  const say = (t: string, ok = false) => { msg.textContent = t; msg.className = `min-h-5 text-sm font-semibold ${ok ? "text-primary" : "text-destructive"}`; };
+  const link = () => { const a = document.querySelector<HTMLAnchorElement>("[data-public-link]"); if (a) a.href = `/b/${f("slug").value}`; };
+  void getMyShop().then((s) => { f("name").value = s.name; f("address").value = s.address; f("whatsapp").value = s.phone_whatsapp; f("slug").value = s.slug; link(); }).catch(() => say("No se pudieron cargar los datos. Recargá la página."));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const fd = new FormData(form);
-    const msg = form.querySelector<HTMLElement>("[data-msg]")!;
-    const current = String(fd.get("current") ?? "");
-    const next = String(fd.get("next") ?? "");
-    const fail = (t: string) => { msg.textContent = t; msg.className = "min-h-5 text-sm font-semibold text-destructive"; };
-    if (!/^\d{4}$/.test(next)) return fail("El PIN nuevo debe tener 4 números.");
-    if (next !== String(fd.get("confirm") ?? "")) return fail("Los PIN nuevos no coinciden.");
-    const res = await changePin({ data: { current, next } }).catch(() => ({ ok: false, message: "No se pudo cambiar el PIN." }));
-    if (!res.ok) return fail(res.message);
-    form.reset();
-    msg.textContent = "PIN actualizado. Usalo la próxima vez que ingreses.";
-    msg.className = "min-h-5 text-sm font-semibold text-primary";
+    const slug = f("slug").value.trim().toLowerCase();
+    if (f("name").value.trim().length < 2) return say("Ingresá el nombre de la barbería.");
+    if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(slug)) return say("La dirección solo admite letras minúsculas, números y guiones (3 a 40).");
+    say("Guardando…", true);
+    const r = await saveMyShop({ data: { name: f("name").value, address: f("address").value, whatsapp: f("whatsapp").value, slug } }).catch(() => ({ ok: false, message: "No se pudo guardar." }));
+    if (!r.ok) return say(r.message);
+    f("slug").value = slug; link(); say("Datos guardados.", true);
   });
 }
 
@@ -179,19 +180,22 @@ function SettingsPage() {
       </form>
     </section>
 
-    <form ref={mountPin} className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
-      <h2 className="flex items-center gap-2 font-bold"><KeyRound className="size-5 text-primary" />Cambiar PIN de acceso</h2>
-      {[["current", "PIN actual"], ["next", "PIN nuevo (4 números)"], ["confirm", "Repetí el PIN nuevo"]].map(([name, label]) => (
-        <input key={name} name={name} type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} autoComplete={name === "current" ? "current-password" : "new-password"} placeholder={label} aria-label={label} className={input} />
-      ))}
+    <form ref={mountShop} className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 font-bold"><Store className="size-5 text-primary" />Datos de la barbería</h2>
+      <input name="name" maxLength={80} placeholder="Nombre" aria-label="Nombre" className={input} />
+      <input name="address" maxLength={160} placeholder="Dirección del local" aria-label="Dirección del local" className={input} />
+      <input name="whatsapp" type="tel" inputMode="tel" maxLength={20} placeholder="WhatsApp (ej: 5491123456789)" aria-label="WhatsApp" className={input} />
+      <label className="block text-sm text-muted-foreground">Dirección de la página (/b/…)
+        <input name="slug" maxLength={40} placeholder="mi-barberia" className={`${input} mt-1 text-foreground`} />
+      </label>
       <p data-msg role="status" className="min-h-5 text-sm font-semibold" />
-      <Button type="submit" className="h-12 w-full text-base font-bold">Cambiar PIN</Button>
+      <Button type="submit" className="h-12 w-full text-base font-bold">Guardar datos</Button>
     </form>
 
     <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
-      {[{ label: "Datos de la barbería", value: "Navaja", icon: Store }, { label: "Notificaciones", value: "Activadas", icon: Bell }].map(({ label, value, icon: Icon }, i) => <div key={label} className={`flex min-h-16 items-center gap-3 p-4 ${i ? "border-t border-border" : ""}`}><Icon className="size-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="font-bold">{label}</p><p className="truncate text-sm text-muted-foreground">{value}</p></div></div>)}
+      {[{ label: "Notificaciones", value: "Activadas", icon: Bell }].map(({ label, value, icon: Icon }, i) => <div key={label} className={`flex min-h-16 items-center gap-3 p-4 ${i ? "border-t border-border" : ""}`}><Icon className="size-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="font-bold">{label}</p><p className="truncate text-sm text-muted-foreground">{value}</p></div></div>)}
     </div>
-    <a href="/reservar" target="_blank" rel="noreferrer" className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface-soft font-bold"><Link2 className="size-5" />Ver página pública de reservas</a>
-    <Button type="button" variant="outline" onClick={() => void logoutBarber().then(() => window.location.assign("/ingresar"))} className="mt-3 h-12 w-full border-destructive/50 text-base font-bold text-destructive"><LogOut />Cerrar sesión</Button>
+    <a data-public-link href="/b/navaja" target="_blank" rel="noreferrer" className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface-soft font-bold"><Link2 className="size-5" />Ver página pública de reservas</a>
+    <Button type="button" variant="outline" onClick={() => void supabase.auth.signOut().then(() => window.location.assign("/ingresar"))} className="mt-3 h-12 w-full border-destructive/50 text-base font-bold text-destructive"><LogOut />Cerrar sesión</Button>
   </BarbershopShell>;
 }

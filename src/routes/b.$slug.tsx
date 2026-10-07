@@ -88,9 +88,9 @@ function mount(root: HTMLElement | null) {
   void info.then((d) => { if (!d) { days.innerHTML = '<p class="text-sm text-destructive">Esta barbería no existe.</p>'; return; } const schedule = d.schedule;
     slots = hourSlots(schedule.open, schedule.close);
     days.replaceChildren();
-    const d = new Date();
+    const now = new Date();
     for (let i = 0; days.children.length < 14 && i < 60; i++) {
-      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
       if (!schedule.days.includes(day.getDay())) continue;
       const b = document.createElement("button");
       const label = day.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
@@ -170,7 +170,7 @@ function BookingPage() {
           Escribinos por WhatsApp
         </a>
         <br />
-        <a href="" className="mt-8 inline-flex h-12 items-center rounded-md border border-border px-5 font-semibold">Hacer otra reserva</a>
+        <a href={`/b/${Route.useParams().slug}`} className="mt-8 inline-flex h-12 items-center rounded-md border border-border px-5 font-semibold">Hacer otra reserva</a>
       </div>
     </main>
   );

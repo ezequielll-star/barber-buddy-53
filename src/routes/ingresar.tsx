@@ -1,80 +1,69 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Delete, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { loginBarber } from "@/lib/bookings.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ingresar")({
-  head: () => ({ meta: [{ title: "Ingresar — Navaja" }, { name: "description", content: "Acceso privado del barbero al panel de Navaja." }, { property: "og:title", content: "Ingresar — Navaja" }, { property: "og:description", content: "Acceso privado del barbero al panel de Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Ingresar — Navaja" }, { name: "description", content: "Acceso privado del dueño de la barbería al panel." }, { property: "og:title", content: "Ingresar — Navaja" }, { property: "og:description", content: "Acceso privado del dueño de la barbería al panel." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
   component: LoginPage,
 });
 
-function paintDots(root: HTMLElement, pin: string) {
-  root.querySelectorAll<HTMLElement>("[data-dot]").forEach((d, i) => d.classList.toggle("bg-primary", i < pin.length));
-}
+const input = "h-12 w-full rounded-md border border-input bg-background px-3 text-base";
 
-function submit(root: HTMLElement) {
-  const pin = root.dataset["pin"] ?? "";
-  const err = root.querySelector("[data-error]")!;
-  if (pin.length !== 4) {
-    err.textContent = "Ingresá los 4 dígitos";
-    return;
-  }
-  if (root.dataset["busy"]) return;
-  root.dataset["busy"] = "1";
-  err.textContent = "Verificando…";
-  loginBarber({ data: { pin } })
-    .then(({ ok }) => {
-      if (ok) {
-        window.location.assign("/");
-        return;
+function mount(form: HTMLFormElement | null) {
+  if (!form || form.dataset["ready"]) return;
+  form.dataset["ready"] = "1";
+  const msg = form.querySelector<HTMLElement>("[data-msg]")!;
+  const title = document.querySelector<HTMLElement>("[data-title]")!;
+  const submitBtn = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+  const toggle = form.querySelector<HTMLButtonElement>("[data-toggle]")!;
+  const say = (t: string, ok = false) => { msg.textContent = t; msg.className = `min-h-5 text-sm font-semibold ${ok ? "text-primary" : "text-destructive"}`; };
+  const paint = () => {
+    const signup = form.dataset["mode"] === "signup";
+    title.textContent = signup ? "Crear cuenta" : "Panel de la barbería";
+    submitBtn.textContent = signup ? "Crear cuenta" : "Entrar al panel";
+    toggle.textContent = signup ? "¿Ya tenés cuenta? Ingresá" : "¿Primera vez? Creá tu cuenta";
+  };
+  toggle.onclick = () => { form.dataset["mode"] = form.dataset["mode"] === "signup" ? "login" : "signup"; say(""); paint(); };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const email = String(fd.get("email") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+    if (!/^\S+@\S+\.\S+$/.test(email)) return say("Ingresá un email válido.");
+    if (password.length < 6) return say("La contraseña debe tener al menos 6 caracteres.");
+    submitBtn.disabled = true;
+    say("Verificando…", true);
+    try {
+      if (form.dataset["mode"] === "signup") {
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+        if (error) return say(error.message.includes("registered") ? "Ese email ya tiene cuenta. Ingresá." : "No se pudo crear la cuenta.");
+        if (!data.session) return say("Te enviamos un email para confirmar tu cuenta. Abrilo y después ingresá.", true);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) return say(error.message.includes("confirm") ? "Confirmá tu email antes de ingresar." : "Email o contraseña incorrectos.");
       }
-      err.textContent = "Clave incorrecta";
-      root.dataset["pin"] = "";
-      paintDots(root, "");
-    })
-    .catch(() => {
-      err.textContent = "No se pudo verificar. Probá de nuevo.";
-    })
-    .finally(() => {
-      delete root.dataset["busy"];
-    });
-}
-
-function press(e: React.MouseEvent<HTMLButtonElement>) {
-  const root = e.currentTarget.closest("[data-pin-root]") as HTMLElement;
-  const key = e.currentTarget.dataset["key"]!;
-  if (root.dataset["busy"]) return;
-  let pin = root.dataset["pin"] ?? "";
-  pin = key === "del" ? pin.slice(0, -1) : (pin + key).slice(0, 4);
-  root.dataset["pin"] = pin;
-  paintDots(root, pin);
-  root.querySelector("[data-error]")!.textContent = "";
-  if (pin.length === 4) submit(root);
-}
-
-function enter(e: React.MouseEvent<HTMLButtonElement>) {
-  const root = e.currentTarget.closest("[data-pin-root]") as HTMLElement;
-  submit(root);
+      window.location.assign("/");
+    } catch { say("No se pudo conectar. Probá de nuevo."); }
+    finally { submitBtn.disabled = false; }
+  });
+  paint();
 }
 
 function LoginPage() {
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
   return (
-    <main data-pin-root className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10 text-foreground">
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10 text-foreground">
       <div className="mx-auto grid size-14 place-items-center rounded-md border border-primary/35 bg-primary/10 text-primary"><Lock className="size-6" /></div>
-      <h1 className="mt-5 text-center text-3xl font-extrabold">Panel del barbero</h1>
-      <p className="mt-2 text-center text-sm text-muted-foreground">Ingresá tu PIN de 4 dígitos</p>
-      <div className="my-8 flex justify-center gap-4">{[0, 1, 2, 3].map((i) => <span key={i} data-dot className="size-4 rounded-full border border-primary" />)}</div>
-      <p data-error role="alert" className="mb-4 h-5 text-center text-sm font-semibold text-destructive" />
-      <div className="grid grid-cols-3 gap-3">
-        {keys.map((k, i) => k === "" ? <span key={i} /> : (
-          <Button key={i} type="button" data-key={k} onClick={press} variant="outline" aria-label={k === "del" ? "Borrar" : k} className="h-16 border-border bg-card text-2xl font-bold">
-            {k === "del" ? <Delete className="size-6" /> : k}
-          </Button>
-        ))}
-      </div>
-      <Button type="button" onClick={enter} className="mt-4 h-14 w-full text-base font-bold">Entrar al panel</Button>
-      <Link to="/reservar" className="mt-8 text-center text-sm font-semibold text-primary">¿Sos cliente? Reservá tu turno</Link>
+      <h1 data-title className="mt-5 text-center text-3xl font-extrabold">Panel de la barbería</h1>
+      <p className="mt-2 text-center text-sm text-muted-foreground">Ingresá con tu email y contraseña</p>
+      <form ref={mount} data-mode="login" className="mt-8 space-y-3">
+        <input name="email" type="email" autoComplete="email" placeholder="Email" aria-label="Email" className={input} />
+        <input name="password" type="password" autoComplete="current-password" placeholder="Contraseña" aria-label="Contraseña" className={input} />
+        <p data-msg role="alert" className="min-h-5 text-sm font-semibold" />
+        <Button type="submit" className="h-14 w-full text-base font-bold">Entrar al panel</Button>
+        <button type="button" data-toggle className="h-12 w-full text-sm font-semibold text-primary" />
+      </form>
+      <Link to="/b/$slug" params={{ slug: "navaja" }} className="mt-6 text-center text-sm font-semibold text-muted-foreground">¿Sos cliente? Reservá tu turno</Link>
     </main>
   );
 }

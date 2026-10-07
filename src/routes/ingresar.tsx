@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Lock } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,6 +25,21 @@ function mount(form: HTMLFormElement | null) {
     toggle.textContent = signup ? "¿Ya tenés cuenta? Ingresá" : "¿Primera vez? Creá tu cuenta";
   };
   toggle.onclick = () => { form.dataset["mode"] = form.dataset["mode"] === "signup" ? "login" : "signup"; say(""); paint(); };
+  const pass = form.querySelector<HTMLInputElement>("input[name=password]")!;
+  const eye = form.querySelector<HTMLButtonElement>("[data-eye]")!;
+  const eyeOn = eye.querySelector<HTMLElement>("[data-eye-on]")!;
+  const eyeOff = eye.querySelector<HTMLElement>("[data-eye-off]")!;
+  eye.onclick = () => {
+    const show = pass.type === "password";
+    const caret = pass.selectionStart ?? pass.value.length;
+    pass.type = show ? "text" : "password";
+    eyeOn.className = show ? "hidden size-5" : "size-5";
+    eyeOff.className = show ? "size-5" : "hidden size-5";
+    eye.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+    eye.setAttribute("aria-pressed", show ? "true" : "false");
+    pass.focus();
+    pass.setSelectionRange(caret, caret);
+  };
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -58,7 +73,13 @@ function LoginPage() {
       <p className="mt-2 text-center text-sm text-muted-foreground">Ingresá con tu email y contraseña</p>
       <form ref={mount} data-mode="login" className="mt-8 space-y-3">
         <input name="email" type="email" autoComplete="email" placeholder="Email" aria-label="Email" className={input} />
-        <input name="password" type="password" autoComplete="current-password" placeholder="Contraseña" aria-label="Contraseña" className={input} />
+        <div className="relative">
+          <input name="password" type="password" autoComplete="current-password" placeholder="Contraseña" aria-label="Contraseña" className={`${input} pr-12`} />
+          <button type="button" data-eye aria-label="Mostrar contraseña" aria-pressed="false" className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-md text-muted-foreground">
+            <Eye data-eye-on className="size-5" />
+            <EyeOff data-eye-off className="hidden size-5" />
+          </button>
+        </div>
         <p data-msg role="alert" className="min-h-5 text-sm font-semibold" />
         <Button type="submit" className="h-14 w-full text-base font-bold">Entrar al panel</Button>
         <button type="button" data-toggle className="h-12 w-full text-sm font-semibold text-primary" />

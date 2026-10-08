@@ -46,6 +46,7 @@ async function admin() {
 async function myShop(db: Db): Promise<Shop> {
   const { data, error } = await db.from("barbershops").select(SHOP_COLS).maybeSingle();
   if (error || !data) throw new Error("No tenés una barbería configurada");
+  if (!data.is_active) throw new Error("Suscripción pausada");
   return data;
 }
 

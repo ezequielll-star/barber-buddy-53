@@ -44,7 +44,7 @@ function mount(root: HTMLElement | null) {
     const box = $("[data-slots]");
     box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Cargando horarios…</p>';
     delete state["time"];
-    const { taken } = await getAvailability({ data: { slug, date: state["date"]!, barberId: state["barber"] || undefined } });
+    const { taken } = await getAvailability({ data: { slug, date: state["date"]!, barberId: state["barber"] === "any" ? undefined : state["barber"] } });
     const today = iso(new Date());
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     box.replaceChildren(...slots.map((t) => {

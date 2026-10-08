@@ -86,7 +86,7 @@ function mount(root: HTMLElement | null) {
     const opts = [{ id: "any", name: "Cualquier barbero disponible" }, ...barbers];
     box.replaceChildren(...opts.map((o) => {
       const b = document.createElement("button");
-      b.type = "button"; b.dataset["group"] = "barber"; b.dataset["value"] = o.id; b.textContent = o.name;
+      b.type = "button"; b.dataset["group"] = "barber"; b.dataset["value"] = o.id; b.textContent = o.name; b.className = chip;
       b.onclick = () => {
         state["barberChoice"] = o.id;
         state["barberLabel"] = o.id === "any" ? "Cualquier barbero" : `con ${o.name}`;
@@ -139,7 +139,7 @@ function mount(root: HTMLElement | null) {
       if (!res.ok) { err.textContent = res.message; void renderSlots(); return; }
       $("[data-flow]").hidden = true;
       $("[data-done]").hidden = false;
-      const who = res.barberName ? ` con ${res.barberName}` : "";
+      const who = res.barberName ? ` con ${res.barberName}` : state["barberChoice"] === "any" ? " con cualquier barbero disponible" : "";
       $("[data-done-text]").textContent = `${state["service"]}${who} · ${state["dateLabel"]} · ${state["time"]}`;
       const wa = $<HTMLAnchorElement>("[data-wa]");
       if (shopWa) {

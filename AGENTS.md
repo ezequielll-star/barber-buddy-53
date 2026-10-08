@@ -9,5 +9,5 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Barber panel routes live under `src/routes/_barbero/` gated by an encrypted-cookie PIN session (`src/lib/bookings.functions.ts`); why: keeps client data and cash private without user accounts.
-- `bookings` table is server-only (RLS on, no policies); public page only receives occupied times via `getAvailability`; why: clients never see other clients' data.
+- Barber panel routes live under `src/routes/_barbero/` and require an authenticated owner session; why: each owner only accesses their own shop data through RLS.
+- Public booking reads are scoped by shop slug and expose only active services, active barbers, and occupied times; why: clients never receive another client's personal data.

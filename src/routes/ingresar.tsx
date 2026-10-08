@@ -33,8 +33,8 @@ function mount(form: HTMLFormElement | null) {
     const show = pass.type === "password";
     const caret = pass.selectionStart ?? pass.value.length;
     pass.type = show ? "text" : "password";
-    eyeOn.className = show ? "hidden size-5" : "size-5";
-    eyeOff.className = show ? "size-5" : "hidden size-5";
+    eyeOn.setAttribute("class", show ? "hidden size-5" : "size-5");
+    eyeOff.setAttribute("class", show ? "size-5" : "hidden size-5");
     eye.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
     eye.setAttribute("aria-pressed", show ? "true" : "false");
     pass.focus();

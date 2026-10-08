@@ -20,6 +20,16 @@ function mount(root: HTMLElement | null) {
   const info = getPublicShop({ data: { slug } });
   const $ = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
 
+  const resetSchedule = () => {
+    delete state["date"];
+    delete state["dateLabel"];
+    delete state["time"];
+    root.querySelectorAll<HTMLButtonElement>('[data-group="date"], [data-group="time"]').forEach((button) => {
+      button.className = `${chip} ${button.disabled ? "cursor-not-allowed opacity-40" : ""}`;
+    });
+    $("[data-slots]").innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Primero elegí un barbero y una fecha.</p>';
+  };
+
   const select = (group: string, value: string) => {
     state[group] = value;
     root.querySelectorAll<HTMLButtonElement>(`[data-group="${group}"]`).forEach((b) => {
@@ -30,6 +40,7 @@ function mount(root: HTMLElement | null) {
 
   let slots: string[] = [];
   const renderSlots = async () => {
+    if (!state["barberChoice"] || !state["date"]) return;
     const box = $("[data-slots]");
     box.innerHTML = '<p class="col-span-3 text-sm text-muted-foreground">Cargando horarios…</p>';
     delete state["time"];
@@ -70,18 +81,22 @@ function mount(root: HTMLElement | null) {
   select("service", "");
   let shopWa = "";
   void info.then((d) => { if (!d) return; const whatsapp = d.shop.whatsapp; const barbers = d.barbers; const nameEl = root.querySelector("[data-shop-name]"); if (nameEl) nameEl.textContent = d.shop.name;
-    shopWa = whatsapp;
-    if (!barbers.length) return;
+    shopWa = whatsapp.replace(/\D/g, "");
     const box = $("[data-barbers]");
-    $("[data-barber-section]").hidden = false;
-    const opts = [{ id: "", name: "Cualquier barbero disponible" }, ...barbers];
+    const opts = [{ id: "any", name: "Cualquier barbero disponible" }, ...barbers];
     box.replaceChildren(...opts.map((o) => {
       const b = document.createElement("button");
       b.type = "button"; b.dataset["group"] = "barber"; b.dataset["value"] = o.id; b.textContent = o.name;
-      b.onclick = () => { state["barberLabel"] = o.id ? `con ${o.name}` : ""; select("barber", o.id); if (state["date"]) void renderSlots(); };
+      b.onclick = () => {
+        state["barberChoice"] = o.id;
+        state["barberLabel"] = o.id === "any" ? "Cualquier barbero" : `con ${o.name}`;
+        select("barber", o.id);
+        resetSchedule();
+        root.querySelectorAll<HTMLButtonElement>('[data-group="date"]').forEach((day) => { day.disabled = false; day.className = chip; });
+        $("[data-date-help]").textContent = "Ahora elegí el día de tu turno.";
+      };
       return b;
     }));
-    select("barber", "");
   }).catch(() => {});
   const days = $("[data-days]");
   days.innerHTML = '<p class="text-sm text-muted-foreground">Cargando fechas…</p>';
@@ -94,13 +109,13 @@ function mount(root: HTMLElement | null) {
       if (!schedule.days.includes(day.getDay())) continue;
       const b = document.createElement("button");
       const label = day.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
-      b.type = "button"; b.dataset["group"] = "date"; b.dataset["value"] = iso(day);
+      b.type = "button"; b.dataset["group"] = "date"; b.dataset["value"] = iso(day); b.disabled = true;
+      b.className = `${chip} cursor-not-allowed opacity-40`;
       b.textContent = label;
-      b.onclick = () => { state["dateLabel"] = label; select("date", iso(day)); void renderSlots(); };
+      b.onclick = () => { if (!state["barberChoice"]) return; state["dateLabel"] = label; select("date", iso(day)); void renderSlots(); };
       days.append(b);
     }
     if (!days.children.length) { days.innerHTML = '<p class="text-sm text-muted-foreground">Por ahora no hay días de atención disponibles.</p>'; return; }
-    (days.firstElementChild as HTMLButtonElement).click();
   });
 
   $("[data-form]").addEventListener("submit", async (e) => {
@@ -108,7 +123,7 @@ function mount(root: HTMLElement | null) {
     const form = e.currentTarget as HTMLFormElement;
     const fd = new FormData(form);
     const err = $("[data-err]");
-    if (!state["service"] || !state["date"] || !state["time"]) { err.textContent = "Elegí servicio, fecha y horario."; return; }
+    if (!state["service"] || !state["barberChoice"] || !state["date"] || !state["time"]) { err.textContent = "Elegí servicio, barbero, fecha y horario."; return; }
     const name = String(fd.get("name") ?? "").trim();
     const whatsapp = String(fd.get("whatsapp") ?? "").trim();
     if (name.length < 2) { err.textContent = "Ingresá tu nombre."; return; }
@@ -117,7 +132,7 @@ function mount(root: HTMLElement | null) {
     const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
     btn.disabled = true; btn.textContent = "Reservando…";
     try {
-      const res = await createBooking({ data: { slug, service: state["service"], date: state["date"], time: state["time"], barberId: state["barber"] || undefined, name, whatsapp } });
+      const res = await createBooking({ data: { slug, service: state["service"], date: state["date"], time: state["time"], barberId: state["barber"] === "any" ? undefined : state["barber"], name, whatsapp } });
       if (!res.ok) { err.textContent = res.message; void renderSlots(); return; }
       $("[data-flow]").hidden = true;
       $("[data-done]").hidden = false;
@@ -145,14 +160,15 @@ function BookingPage() {
         <h1 className="pb-5 pt-6 text-4xl font-extrabold leading-tight">Reservá tu turno</h1>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em]">1. Servicio</h2>
         <div data-services className="grid gap-2" />
-        <div data-barber-section hidden>
-          <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">Barbero</h2>
-          <div data-barbers className="grid grid-cols-2 gap-2 [&>button:first-child]:col-span-2" />
+        <div data-barber-section>
+          <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">2. Barbero</h2>
+          <div data-barbers className="grid grid-cols-2 gap-2 [&>button:first-child]:col-span-2"><p className="col-span-2 text-sm text-muted-foreground">Cargando barberos…</p></div>
         </div>
-        <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">2. Fecha</h2>
+        <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">3. Fecha</h2>
+        <p data-date-help className="mb-3 text-sm text-muted-foreground">Primero elegí un barbero.</p>
         <div data-days className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 [&>button]:shrink-0 [&>button]:capitalize" />
-        <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">3. Horario</h2>
-        <div data-slots className="grid grid-cols-3 gap-2" />
+        <h2 className="mb-3 mt-7 text-sm font-bold uppercase tracking-[0.14em]">4. Horario</h2>
+        <div data-slots className="grid grid-cols-3 gap-2"><p className="col-span-3 text-sm text-muted-foreground">Primero elegí un barbero y una fecha.</p></div>
         <form data-form className="mt-8 space-y-3 rounded-lg border border-border bg-card p-4">
           <p data-summary className="text-sm font-semibold text-primary" />
           <input name="name" autoComplete="name" placeholder="Tu nombre" maxLength={80} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base" />

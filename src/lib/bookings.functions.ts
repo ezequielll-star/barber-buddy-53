@@ -27,7 +27,7 @@ export type Service = { id: string; name: string; price: number; duration_min: n
 export type Barber = { id: string; name: string; active: boolean };
 export type Shop = { id: string; name: string; slug: string; phone_whatsapp: string; address: string; logo_url: string; open_time: string; close_time: string; open_days: number[] };
 
-const SHOP_COLS = "id, name, slug, phone_whatsapp, address, logo_url, open_time, close_time, open_days";
+const SHOP_COLS = "id, name, slug, phone_whatsapp, address, logo_url, open_time, close_time, open_days, is_active";
 const SVC_COLS = "id, name, price, duration_min, description, active";
 const slugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/);
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -130,12 +130,13 @@ export const getPublicShop = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const shop = await shopBySlug(data.slug);
     if (!shop) return null;
+    if (!shop.is_active) return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: false }, schedule: { open: shop.open_time, close: shop.close_time, days: [] as number[] }, services: [], barbers: [] };
     const db = publicDb();
     const [{ data: services }, { data: barbers }] = await Promise.all([
       db.from("services").select(SVC_COLS).eq("barbershop_id", shop.id).eq("active", true).order("price"),
       db.from("barbers").select("id, name").eq("barbershop_id", shop.id).eq("active", true).order("created_at"),
     ]);
-    return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url }, schedule: { open: shop.open_time, close: shop.close_time, days: shop.open_days }, services: services ?? [], barbers: barbers ?? [] };
+    return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: shop.is_active }, schedule: { open: shop.open_time, close: shop.close_time, days: shop.open_days }, services: services ?? [], barbers: barbers ?? [] };
   });
 
 const barberSel = z.string().uuid().optional();
@@ -164,6 +165,7 @@ export const createBooking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const shop = await shopBySlug(data.slug);
     if (!shop) return { ok: false, message: "Esta barbería no existe." };
+    if (!shop.is_active) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
     const day = new Date(`${data.date}T12:00:00Z`).getUTCDay();
     if (!shop.open_days.includes(day) || !hourSlots(shop.open_time, shop.close_time).includes(data.time)) return { ok: false, message: "Ese horario no está disponible." };
     const db = await admin();

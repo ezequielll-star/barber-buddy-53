@@ -116,6 +116,9 @@ function mount(root: HTMLElement | null) {
       days.append(b);
     }
     if (!days.children.length) { days.innerHTML = '<p class="text-sm text-muted-foreground">Por ahora no hay días de atención disponibles.</p>'; return; }
+    if (state["barberChoice"]) {
+      root.querySelectorAll<HTMLButtonElement>('[data-group="date"]').forEach((day) => { day.disabled = false; day.className = chip; });
+    }
   });
 
   $("[data-form]").addEventListener("submit", async (e) => {

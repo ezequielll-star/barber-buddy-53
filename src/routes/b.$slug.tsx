@@ -80,7 +80,7 @@ function mount(root: HTMLElement | null) {
   }).catch(() => { svcBox.innerHTML = '<p class="text-sm text-destructive">No se pudieron cargar los servicios.</p>'; });
   select("service", "");
   let shopWa = "";
-  void info.then((d) => { if (!d) return; const whatsapp = d.shop.whatsapp; const barbers = d.barbers; const nameEl = root.querySelector("[data-shop-name]"); if (nameEl) nameEl.textContent = d.shop.name;
+  void info.then((d) => { if (!d) return; const whatsapp = d.shop.whatsapp; const barbers = d.barbers; const nameEl = root.querySelector("[data-shop-name]"); if (nameEl) nameEl.textContent = d.shop.name; if (!d.shop.active) { $("[data-flow]").hidden = true; $("[data-inactive]").hidden = false; return; }
     shopWa = whatsapp.replace(/\D/g, "");
     const box = $("[data-barbers]");
     const opts = [{ id: "any", name: "Cualquier barbero disponible" }, ...barbers];
@@ -159,6 +159,7 @@ function BookingPage() {
         <div className="grid size-11 place-items-center rounded-md border border-primary/35 bg-primary/10 text-primary"><Scissors className="size-5" /></div>
         <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary"><span data-shop-name>Barbería</span></p><p className="text-sm text-muted-foreground">Barbería & estudio</p></div>
       </header>
+      <div data-inactive hidden className="mt-16 rounded-lg border border-border bg-card p-6 text-center"><h1 className="text-2xl font-extrabold">Barbería inactiva</h1><p className="mt-3 text-muted-foreground">Esta barbería se encuentra temporalmente inactiva. Por favor, contactate directamente con el local para agendar tu turno.</p></div>
       <div data-flow>
         <h1 className="pb-5 pt-6 text-4xl font-extrabold leading-tight">Reservá tu turno</h1>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em]">1. Servicio</h2>

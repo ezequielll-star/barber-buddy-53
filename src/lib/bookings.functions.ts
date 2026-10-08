@@ -25,7 +25,7 @@ export function hourSlots(open: string, close: string) {
 export type Schedule = { open: string; close: string; days: number[] };
 export type Service = { id: string; name: string; price: number; duration_min: number; description: string; active: boolean };
 export type Barber = { id: string; name: string; active: boolean };
-export type Shop = { id: string; name: string; slug: string; phone_whatsapp: string; address: string; logo_url: string; open_time: string; close_time: string; open_days: number[] };
+export type Shop = { id: string; name: string; slug: string; phone_whatsapp: string; address: string; logo_url: string; open_time: string; close_time: string; open_days: number[]; is_active: boolean };
 
 const SHOP_COLS = "id, name, slug, phone_whatsapp, address, logo_url, open_time, close_time, open_days, is_active";
 const SVC_COLS = "id, name, price, duration_min, description, active";

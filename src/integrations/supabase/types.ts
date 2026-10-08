@@ -52,6 +52,7 @@ export type Database = {
           close_time: string
           created_at: string
           id: string
+          is_active: boolean
           logo_url: string
           name: string
           open_days: number[]
@@ -65,6 +66,7 @@ export type Database = {
           close_time?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           logo_url?: string
           name?: string
           open_days?: number[]
@@ -78,6 +80,7 @@ export type Database = {
           close_time?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           logo_url?: string
           name?: string
           open_days?: number[]

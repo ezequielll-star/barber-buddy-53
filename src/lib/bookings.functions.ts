@@ -13,18 +13,18 @@ export const SERVICES = [
 
 export const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-/** 60-minute blocks from open until the last block that ends by close. */
+/** 30-minute blocks from open until the last block that ends by close. */
 export function hourSlots(open: string, close: string) {
   const [oh, om] = open.split(":").map(Number);
   const [ch, cm] = close.split(":").map(Number);
   const out: string[] = [];
-  for (let t = oh! * 60 + om!; t + 60 <= ch! * 60 + cm!; t += 60) out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+  for (let t = oh! * 60 + om!; t + 30 <= ch! * 60 + cm!; t += 30) out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
   return out;
 }
 
 export type Schedule = { open: string; close: string; days: number[] };
 export type Service = { id: string; name: string; price: number; duration_min: number; description: string; active: boolean };
-export type Barber = { id: string; name: string; active: boolean };
+export type Barber = { id: string; name: string; active: boolean; avatar_url: string };
 export type Shop = { id: string; name: string; slug: string; phone_whatsapp: string; address: string; logo_url: string; open_time: string; close_time: string; open_days: number[]; is_active: boolean };
 
 const SHOP_COLS = "id, name, slug, phone_whatsapp, address, logo_url, open_time, close_time, open_days, is_active";
@@ -135,7 +135,7 @@ export const getPublicShop = createServerFn({ method: "GET" })
     const db = publicDb();
     const [{ data: services }, { data: barbers }] = await Promise.all([
       db.from("services").select(SVC_COLS).eq("barbershop_id", shop.id).eq("active", true).order("price"),
-      db.from("barbers").select("id, name").eq("barbershop_id", shop.id).eq("active", true).order("created_at"),
+      db.from("barbers").select("id, name, avatar_url").eq("barbershop_id", shop.id).eq("active", true).order("created_at"),
     ]);
     return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: shop.is_active }, schedule: { open: shop.open_time, close: shop.close_time, days: shop.open_days }, services: services ?? [], barbers: barbers ?? [] };
   });
@@ -263,14 +263,14 @@ export const deleteService = createServerFn({ method: "POST" })
 export const listAllBarbers = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<Barber[]> => {
   const db = context.supabase as Db;
   const shop = await myShop(db);
-  const { data, error } = await db.from("barbers").select("id, name, active").eq("barbershop_id", shop.id).order("created_at");
+  const { data, error } = await db.from("barbers").select("id, name, active, avatar_url").eq("barbershop_id", shop.id).order("created_at");
   if (error) throw new Error("No se pudieron cargar los barberos");
   return data ?? [];
 });
 
 export const saveBarber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(2).max(60), active: z.boolean() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(2).max(60), active: z.boolean(), avatar_url: z.union([z.literal(""), z.string().trim().url().max(500).refine((u) => u.startsWith("https://"))]).default("") }).parse(d))
   .handler(async ({ data, context }) => {
     const db = context.supabase as Db;
     const shop = await myShop(db);
@@ -283,6 +283,9 @@ export const deleteBarber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await (context.supabase as Db).from("barbers").delete().eq("id", data.id);
+    const db = context.supabase as Db;
+    const shop = await myShop(db);
+    await db.from("bookings").update({ barber_id: null }).eq("barber_id", data.id).eq("barbershop_id", shop.id);
+    const { error } = await db.from("barbers").delete().eq("id", data.id).eq("barbershop_id", shop.id);
     return error ? { ok: false, message: "No se pudo eliminar." } : { ok: true, message: "" };
   });

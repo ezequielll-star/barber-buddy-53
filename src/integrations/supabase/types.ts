@@ -17,6 +17,7 @@ export type Database = {
       barbers: {
         Row: {
           active: boolean
+          avatar_url: string
           barbershop_id: string
           created_at: string
           id: string
@@ -24,6 +25,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          avatar_url?: string
           barbershop_id: string
           created_at?: string
           id?: string
@@ -31,6 +33,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          avatar_url?: string
           barbershop_id?: string
           created_at?: string
           id?: string

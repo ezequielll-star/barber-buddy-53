@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Clock3, Scissors, Link2, LogOut, Settings, Store } from "lucide-react";
+import { Users, Bell, Clock3, Scissors, Link2, LogOut, Settings, Store } from "lucide-react";
 import { BarbershopShell, PageIntro } from "@/components/barbershop-shell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { DAY_NAMES, type Service, deleteService, getMyShop, saveMyShop, listAllServices, saveService, getSchedule, hourSlots, saveSchedule } from "@/lib/bookings.functions";
+import { DAY_NAMES, type Service, type Barber, listAllBarbers, saveBarber, deleteBarber, deleteService, getMyShop, saveMyShop, listAllServices, saveService, getSchedule, hourSlots, saveSchedule } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/_barbero/ajustes")({
   head: () => ({ meta: [{ title: "Ajustes — Navaja" }, { name: "description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:title", content: "Ajustes — Navaja" }, { property: "og:description", content: "Horarios, días de atención y PIN del panel de Navaja." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_barbero/ajustes")({
 
 const input = "h-12 w-full rounded-md border border-input bg-background px-3 text-base";
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const HOURS_24 = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
+const HOURS_24 = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
 
 function mountSchedule(form: HTMLFormElement | null) {
   if (!form || form.dataset["ready"]) return;
@@ -22,7 +22,7 @@ function mountSchedule(form: HTMLFormElement | null) {
   const refresh = () => {
     const fd = new FormData(form);
     const slots = hourSlots(String(fd.get("open") || "00:00"), String(fd.get("close") || "00:00"));
-    preview.textContent = slots.length ? `${slots.length} turnos de 1 hora: ${slots.join(", ")}` : "El cierre debe ser al menos 1 hora después de la apertura.";
+    preview.textContent = slots.length ? `${slots.length} turnos de 30 minutos: ${slots.join(", ")}` : "El cierre debe ser al menos 30 minutos después de la apertura.";
     form.querySelectorAll<HTMLInputElement>("input[name=day]").forEach((c) => {
       const tag = c.closest("label")!.querySelector("[data-state]")!;
       tag.textContent = c.checked ? "Abierto" : "Cerrado";
@@ -128,6 +128,67 @@ function mountServices(root: HTMLElement | null) {
   void load();
 }
 
+function mountTeam(root: HTMLElement | null) {
+  if (!root || root.dataset["ready"]) return;
+  root.dataset["ready"] = "1";
+  const list = root.querySelector<HTMLElement>("[data-list]")!;
+  const form = root.querySelector<HTMLFormElement>("form")!;
+  const msg = form.querySelector<HTMLElement>("[data-msg]")!;
+  const title = form.querySelector<HTMLElement>("[data-title]")!;
+  const cancel = form.querySelector<HTMLButtonElement>("[data-cancel]")!;
+  const f = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+  const say = (t: string, ok = false) => { msg.textContent = t; msg.className = `min-h-5 text-sm font-semibold ${ok ? "text-primary" : "text-destructive"}`; };
+  const fill = (b?: Barber) => {
+    f("id").value = b?.id ?? ""; f("name").value = b?.name ?? ""; f("avatar").value = b?.avatar_url ?? ""; f("active").checked = b?.active ?? true;
+    title.textContent = b ? `Editar: ${b.name}` : "Agregar barbero"; cancel.hidden = !b;
+  };
+  const avatar = (b: Barber) => {
+    const el = document.createElement(b.avatar_url ? "img" : "div");
+    el.className = "grid size-11 shrink-0 place-items-center rounded-full bg-primary/15 object-cover font-bold text-primary";
+    if (b.avatar_url) { (el as HTMLImageElement).src = b.avatar_url; (el as HTMLImageElement).alt = b.name; } else el.textContent = b.name.slice(0, 1).toUpperCase();
+    return el;
+  };
+  const load = async () => {
+    list.innerHTML = '<p class="p-4 text-sm text-muted-foreground">Cargando equipo…</p>';
+    const items = await listAllBarbers().catch(() => null);
+    if (!items) { list.innerHTML = '<p class="p-4 text-sm text-destructive">No se pudo cargar el equipo.</p>'; return; }
+    if (!items.length) { list.innerHTML = '<p class="p-4 text-sm text-muted-foreground">Todavía no hay barberos.</p>'; return; }
+    list.replaceChildren(...items.map((b, i) => {
+      const row = document.createElement("div");
+      row.className = `flex items-center gap-3 p-3 ${i ? "border-t border-border" : ""} ${b.active ? "" : "opacity-50"}`;
+      const n = document.createElement("p"); n.className = "min-w-0 flex-1 truncate font-bold"; n.textContent = b.name + (b.active ? "" : " (oculto)");
+      const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Editar";
+      edit.className = "h-11 rounded-md border border-border px-3 text-sm font-bold";
+      edit.onclick = () => { fill(b); say(""); form.scrollIntoView({ behavior: "smooth", block: "center" }); };
+      const del = document.createElement("button"); del.type = "button"; del.textContent = "Eliminar";
+      del.className = "h-11 rounded-md border border-destructive/50 px-3 text-sm font-bold text-destructive";
+      del.onclick = async () => {
+        if (!window.confirm(`¿Eliminar a ${b.name}?`)) return;
+        const r = await deleteBarber({ data: { id: b.id } }).catch(() => ({ ok: false, message: "No se pudo eliminar." }));
+        if (!r.ok) return say(r.message);
+        if (f("id").value === b.id) fill();
+        void load();
+      };
+      row.append(avatar(b), n, edit, del);
+      return row;
+    }));
+  };
+  cancel.onclick = () => { fill(); say(""); };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (f("name").value.trim().length < 2) return say("Ingresá el nombre del barbero.");
+    const url = f("avatar").value.trim();
+    if (url && !/^https:\/\/\S+$/.test(url)) return say("La foto debe ser un enlace que empiece con https://");
+    say("Guardando…", true);
+    const r = await saveBarber({ data: { id: f("id").value || undefined, name: f("name").value, active: f("active").checked, avatar_url: url } }).catch(() => ({ ok: false, message: "No se pudo guardar." }));
+    if (!r.ok) return say(r.message);
+    fill(); say("Barbero guardado. Ya aparece en la página de reservas.", true);
+    void load();
+  });
+  fill();
+  void load();
+}
+
 function SettingsPage() {
   return <BarbershopShell active="settings" action={<div className="grid size-11 place-items-center rounded-md border border-border bg-card text-primary"><Settings className="size-5" /></div>}>
     <PageIntro eyebrow="Preferencias" title="Ajustes" description="Horarios, días de atención y acceso al panel." />
@@ -176,6 +237,21 @@ function SettingsPage() {
         <label className="flex min-h-12 items-center gap-3"><input type="checkbox" name="active" className="size-5 accent-primary" /><span className="font-semibold">Visible en la página de reservas</span></label>
         <p data-msg role="status" className="min-h-5 text-sm font-semibold" />
         <Button type="submit" className="h-12 w-full text-base font-bold">Guardar servicio</Button>
+        <Button type="button" variant="outline" data-cancel hidden className="h-12 w-full text-base font-bold">Cancelar edición</Button>
+      </form>
+    </section>
+
+    <section ref={mountTeam} className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 font-bold"><Users className="size-5 text-primary" />Equipo de barberos</h2>
+      <div data-list className="overflow-hidden rounded-md border border-border bg-surface-soft" />
+      <form className="space-y-3 pt-2">
+        <h3 data-title className="text-sm font-bold uppercase tracking-[0.14em]">Agregar barbero</h3>
+        <input type="hidden" name="id" />
+        <input name="name" maxLength={60} placeholder="Nombre (ej: Juan)" aria-label="Nombre del barbero" className={input} />
+        <input name="avatar" type="url" maxLength={500} placeholder="Foto: enlace https://… (opcional)" aria-label="Enlace de la foto" className={input} />
+        <label className="flex min-h-12 items-center gap-3"><input type="checkbox" name="active" className="size-5 accent-primary" /><span className="font-semibold">Visible en la página de reservas</span></label>
+        <p data-msg role="status" className="min-h-5 text-sm font-semibold" />
+        <Button type="submit" className="h-12 w-full text-base font-bold">Guardar barbero</Button>
         <Button type="button" variant="outline" data-cancel hidden className="h-12 w-full text-base font-bold">Cancelar edición</Button>
       </form>
     </section>

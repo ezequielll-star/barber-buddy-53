@@ -86,6 +86,7 @@ export const ensureMyShop = createServerFn({ method: "POST" })
     // RLS hides paused shops from their owner; look up only this user's status to show the lock screen.
     const adm = await admin();
     const { data: paused } = await adm.from("barbershops").select("name, is_active").eq("owner_id", context.userId).maybeSingle();
+    if (paused?.is_active) throw new Error("No se pudo cargar tu barbería");
     if (paused) return { id: "", name: paused.name, slug: "", phone_whatsapp: "", address: "", logo_url: "", open_time: "", close_time: "", open_days: [], is_active: false };
     const base = String(context.claims?.email ?? "barberia").split("@")[0]!.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "barberia";
     const slug = `${base.length < 2 ? "barberia" : base}-${Math.random().toString(36).slice(2, 7)}`;
@@ -190,6 +191,7 @@ export const createBooking = createServerFn({ method: "POST" })
     if (!shop.is_active) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
     const day = new Date(`${data.date}T12:00:00Z`).getUTCDay();
     if (!shop.open_days.includes(day) || !hourSlots(shop.open_time, shop.close_time).includes(data.time)) return { ok: false, message: "Ese horario no está disponible." };
+    if (!isBookableSlot(data.date, data.time)) return { ok: false, message: "Ese horario ya pasó o está fuera del rango de reservas. Elegí otro." };
     const db = await admin();
     const { data: svc } = await db.from("services").select("id").eq("barbershop_id", shop.id).eq("name", data.service).eq("active", true).limit(1).maybeSingle();
     if (!svc) return { ok: false, message: "Ese servicio ya no está disponible." };
@@ -200,7 +202,12 @@ export const createBooking = createServerFn({ method: "POST" })
     if (barberId) barberName = (await db.from("barbers").select("name").eq("id", barberId).eq("barbershop_id", shop.id).maybeSingle()).data?.name ?? null;
     const phone = data.whatsapp.replace(/\D/g, "");
     const { error } = await db.from("bookings").insert({ barbershop_id: shop.id, service: data.service, booking_date: data.date, booking_time: data.time, barber_id: barberId, barber_name: barberName, client_name: data.name, whatsapp: phone });
-    if (error) return { ok: false, message: error.code === "23505" ? "Ese horario acaba de ocuparse. Elegí otro." : "No se pudo guardar la reserva." };
+    if (error) {
+      if (error.code === "23505") return { ok: false, message: "Ese horario acaba de ocuparse. Elegí otro." };
+      if (error.message.includes("shop_inactive")) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
+      if (error.message.includes("booking_")) return { ok: false, message: "Ese horario ya pasó o está fuera del rango de reservas. Elegí otro." };
+      return { ok: false, message: "No se pudo guardar la reserva." };
+    }
     await db.from("clients").upsert({ barbershop_id: shop.id, name: data.name, phone }, { onConflict: "barbershop_id,phone", ignoreDuplicates: true });
     return { ok: true, message: "", barberName };
   });

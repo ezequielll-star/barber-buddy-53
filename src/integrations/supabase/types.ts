@@ -268,6 +268,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_barbers: {
+        Args: { _slug: string }
+        Returns: {
+          avatar_url: string
+          id: string
+          name: string
+        }[]
+      }
+      get_public_services: {
+        Args: { _slug: string }
+        Returns: {
+          active: boolean
+          description: string
+          duration_min: number
+          id: string
+          name: string
+          price: number
+        }[]
+      }
+      get_public_shop: {
+        Args: { _slug: string }
+        Returns: {
+          address: string
+          close_time: string
+          id: string
+          is_active: boolean
+          logo_url: string
+          name: string
+          open_days: number[]
+          open_time: string
+          phone_whatsapp: string
+          slug: string
+        }[]
+      }
       is_shop_owner: { Args: { _shop: string }; Returns: boolean }
     }
     Enums: {

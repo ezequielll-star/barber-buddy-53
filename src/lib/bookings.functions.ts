@@ -50,24 +50,44 @@ async function myShop(db: Db): Promise<Shop> {
   return data;
 }
 
+/** Public, slug-scoped read through a security-definer function (no shop listing, no owner_id). */
 async function shopBySlug(slug: string): Promise<Shop | null> {
-  const { data } = await publicDb().from("barbershops").select(SHOP_COLS).eq("slug", slug).maybeSingle();
-  return data ?? null;
+  const { data } = await publicDb().rpc("get_public_shop", { _slug: slug });
+  return (data?.[0] as Shop | undefined) ?? null;
 }
 
-/** Returns the owner's shop, creating it on first sign-in. The first owner ever claims the original shop and its data. */
+const AR_TZ = "America/Argentina/Buenos_Aires";
+export const MAX_DAYS_AHEAD = 60;
+
+/** Current date (YYYY-MM-DD) and minutes since midnight in the shop's timezone (Argentina). */
+export function shopNow(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: AR_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now).map((p) => [p.type, p.value]));
+  return { date: `${parts["year"]}-${parts["month"]}-${parts["day"]}`, minutes: Number(parts["hour"]) * 60 + Number(parts["minute"]) };
+}
+
+/** Rejects past dates, past times of today, and dates beyond the booking window. */
+export function isBookableSlot(date: string, time: string, now = new Date()) {
+  const { date: today, minutes } = shopNow(now);
+  if (date < today) return false;
+  const [h, m] = time.split(":").map(Number);
+  if (date === today && h! * 60 + m! <= minutes) return false;
+  const limit = new Date(`${today}T12:00:00Z`);
+  limit.setUTCDate(limit.getUTCDate() + MAX_DAYS_AHEAD);
+  return date <= limit.toISOString().slice(0, 10);
+}
+
+/** Returns the owner's shop, creating it on first sign-in. A paused shop only returns its name and status. */
 export const ensureMyShop = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<Shop> => {
     const db = context.supabase as Db;
     const { data: mine } = await db.from("barbershops").select(SHOP_COLS).maybeSingle();
     if (mine) return mine;
+    // RLS hides paused shops from their owner; look up only this user's status to show the lock screen.
     const adm = await admin();
-    const { count } = await adm.from("barbershops").select("id", { count: "exact", head: true }).not("owner_id", "is", null);
-    if (!count) {
-      const { data: claimed } = await adm.from("barbershops").update({ owner_id: context.userId }).is("owner_id", null).eq("slug", "navaja").select(SHOP_COLS).maybeSingle();
-      if (claimed) return claimed;
-    }
+    const { data: paused } = await adm.from("barbershops").select("name, is_active").eq("owner_id", context.userId).maybeSingle();
+    if (paused?.is_active) throw new Error("No se pudo cargar tu barbería");
+    if (paused) return { id: "", name: paused.name, slug: "", phone_whatsapp: "", address: "", logo_url: "", open_time: "", close_time: "", open_days: [], is_active: false };
     const base = String(context.claims?.email ?? "barberia").split("@")[0]!.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "barberia";
     const slug = `${base.length < 2 ? "barberia" : base}-${Math.random().toString(36).slice(2, 7)}`;
     const { data, error } = await db.from("barbershops").insert({ owner_id: context.userId, name: "Mi barbería", slug }).select(SHOP_COLS).single();
@@ -134,8 +154,8 @@ export const getPublicShop = createServerFn({ method: "GET" })
     if (!shop.is_active) return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: false }, schedule: { open: shop.open_time, close: shop.close_time, days: [] as number[] }, services: [], barbers: [] };
     const db = publicDb();
     const [{ data: services }, { data: barbers }] = await Promise.all([
-      db.from("services").select(SVC_COLS).eq("barbershop_id", shop.id).eq("active", true).order("price"),
-      db.from("barbers").select("id, name, avatar_url").eq("barbershop_id", shop.id).eq("active", true).order("created_at"),
+      db.rpc("get_public_services", { _slug: shop.slug }),
+      db.rpc("get_public_barbers", { _slug: shop.slug }),
     ]);
     return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: shop.is_active }, schedule: { open: shop.open_time, close: shop.close_time, days: shop.open_days }, services: services ?? [], barbers: barbers ?? [] };
   });
@@ -147,8 +167,10 @@ export const getAvailability = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const shop = await shopBySlug(data.slug);
     if (!shop) return { taken: [] as string[] };
+    const slots = hourSlots(shop.open_time, shop.close_time);
+    if (!shop.is_active) return { taken: slots };
     const { freeAt } = await dayLoad(shop.id, data.date);
-    return { taken: hourSlots(shop.open_time, shop.close_time).filter((t) => !freeAt(t, data.barberId).length) };
+    return { taken: slots.filter((t) => !isBookableSlot(data.date, t) || !freeAt(t, data.barberId).length) };
   });
 
 export const createBooking = createServerFn({ method: "POST" })
@@ -169,6 +191,7 @@ export const createBooking = createServerFn({ method: "POST" })
     if (!shop.is_active) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
     const day = new Date(`${data.date}T12:00:00Z`).getUTCDay();
     if (!shop.open_days.includes(day) || !hourSlots(shop.open_time, shop.close_time).includes(data.time)) return { ok: false, message: "Ese horario no está disponible." };
+    if (!isBookableSlot(data.date, data.time)) return { ok: false, message: "Ese horario ya pasó o está fuera del rango de reservas. Elegí otro." };
     const db = await admin();
     const { data: svc } = await db.from("services").select("id").eq("barbershop_id", shop.id).eq("name", data.service).eq("active", true).limit(1).maybeSingle();
     if (!svc) return { ok: false, message: "Ese servicio ya no está disponible." };
@@ -179,7 +202,12 @@ export const createBooking = createServerFn({ method: "POST" })
     if (barberId) barberName = (await db.from("barbers").select("name").eq("id", barberId).eq("barbershop_id", shop.id).maybeSingle()).data?.name ?? null;
     const phone = data.whatsapp.replace(/\D/g, "");
     const { error } = await db.from("bookings").insert({ barbershop_id: shop.id, service: data.service, booking_date: data.date, booking_time: data.time, barber_id: barberId, barber_name: barberName, client_name: data.name, whatsapp: phone });
-    if (error) return { ok: false, message: error.code === "23505" ? "Ese horario acaba de ocuparse. Elegí otro." : "No se pudo guardar la reserva." };
+    if (error) {
+      if (error.code === "23505") return { ok: false, message: "Ese horario acaba de ocuparse. Elegí otro." };
+      if (error.message.includes("shop_inactive")) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
+      if (error.message.includes("booking_")) return { ok: false, message: "Ese horario ya pasó o está fuera del rango de reservas. Elegí otro." };
+      return { ok: false, message: "No se pudo guardar la reserva." };
+    }
     await db.from("clients").upsert({ barbershop_id: shop.id, name: data.name, phone }, { onConflict: "barbershop_id,phone", ignoreDuplicates: true });
     return { ok: true, message: "", barberName };
   });

@@ -36,6 +36,13 @@
       "when": 1791839643117,
       "tag": "0004_barber_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793726236616,
+      "tag": "0005_security_stage1",
+      "breakpoints": true
     }
   ]
 }

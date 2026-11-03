@@ -153,8 +153,8 @@ export const getPublicShop = createServerFn({ method: "GET" })
     if (!shop.is_active) return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: false }, schedule: { open: shop.open_time, close: shop.close_time, days: [] as number[] }, services: [], barbers: [] };
     const db = publicDb();
     const [{ data: services }, { data: barbers }] = await Promise.all([
-      db.from("services").select(SVC_COLS).eq("barbershop_id", shop.id).eq("active", true).order("price"),
-      db.from("barbers").select("id, name, avatar_url").eq("barbershop_id", shop.id).eq("active", true).order("created_at"),
+      db.rpc("get_public_services", { _slug: shop.slug }),
+      db.rpc("get_public_barbers", { _slug: shop.slug }),
     ]);
     return { shop: { name: shop.name, slug: shop.slug, address: shop.address, whatsapp: shop.phone_whatsapp, logo_url: shop.logo_url, active: shop.is_active }, schedule: { open: shop.open_time, close: shop.close_time, days: shop.open_days }, services: services ?? [], barbers: barbers ?? [] };
   });
@@ -166,8 +166,10 @@ export const getAvailability = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const shop = await shopBySlug(data.slug);
     if (!shop) return { taken: [] as string[] };
+    const slots = hourSlots(shop.open_time, shop.close_time);
+    if (!shop.is_active) return { taken: slots };
     const { freeAt } = await dayLoad(shop.id, data.date);
-    return { taken: hourSlots(shop.open_time, shop.close_time).filter((t) => !freeAt(t, data.barberId).length) };
+    return { taken: slots.filter((t) => !isBookableSlot(data.date, t) || !freeAt(t, data.barberId).length) };
   });
 
 export const createBooking = createServerFn({ method: "POST" })

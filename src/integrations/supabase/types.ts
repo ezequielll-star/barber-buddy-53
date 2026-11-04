@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_email: string
+          actor_id: string | null
+          barbershop_id: string | null
+          created_at: string
+          details: Json
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string
+          actor_id?: string | null
+          barbershop_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string
+          actor_id?: string | null
+          barbershop_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Relationships: []
+      }
       barbers: {
         Row: {
           active: boolean
@@ -52,6 +82,7 @@ export type Database = {
       barbershops: {
         Row: {
           address: string
+          archived_at: string | null
           close_time: string
           created_at: string
           id: string
@@ -61,11 +92,13 @@ export type Database = {
           open_days: number[]
           open_time: string
           owner_id: string | null
+          pending_owner_email: string | null
           phone_whatsapp: string
           slug: string
         }
         Insert: {
           address?: string
+          archived_at?: string | null
           close_time?: string
           created_at?: string
           id?: string
@@ -75,11 +108,13 @@ export type Database = {
           open_days?: number[]
           open_time?: string
           owner_id?: string | null
+          pending_owner_email?: string | null
           phone_whatsapp?: string
           slug: string
         }
         Update: {
           address?: string
+          archived_at?: string | null
           close_time?: string
           created_at?: string
           id?: string
@@ -89,6 +124,7 @@ export type Database = {
           open_days?: number[]
           open_time?: string
           owner_id?: string | null
+          pending_owner_email?: string | null
           phone_whatsapp?: string
           slug?: string
         }
@@ -263,11 +299,189 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          barbershop_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string
+          paid_on: string
+          period_due: string | null
+        }
+        Insert: {
+          amount: number
+          barbershop_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string
+          paid_on: string
+          period_due?: string | null
+        }
+        Update: {
+          amount?: number
+          barbershop_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string
+          paid_on?: string
+          period_due?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: false
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          barbershop_id: string
+          due_date: string | null
+          last_paid_on: string | null
+          monthly_price: number
+          notes: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          barbershop_id: string
+          due_date?: string | null
+          last_paid_on?: string | null
+          monthly_price?: number
+          notes?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          barbershop_id?: string
+          due_date?: string | null
+          last_paid_on?: string | null
+          monthly_price?: number
+          notes?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_barbershop_id_fkey"
+            columns: ["barbershop_id"]
+            isOneToOne: true
+            referencedRelation: "barbershops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_archive_shop: {
+        Args: { _confirm_name: string; _shop: string }
+        Returns: undefined
+      }
+      admin_create_shop: {
+        Args: { _name: string; _owner_email: string; _slug: string }
+        Returns: string
+      }
+      admin_list_audit: {
+        Args: { _limit?: number; _shop?: string }
+        Returns: {
+          action: string
+          actor_email: string
+          barbershop_id: string
+          created_at: string
+          details: Json
+          id: string
+          shop_name: string
+        }[]
+      }
+      admin_list_payments: {
+        Args: { _shop: string }
+        Returns: {
+          amount: number
+          created_at: string
+          id: string
+          note: string
+          paid_on: string
+          period_due: string
+        }[]
+      }
+      admin_list_shops: {
+        Args: never
+        Returns: {
+          address: string
+          archived_at: string
+          bookings_count: number
+          clients_count: number
+          created_at: string
+          due_date: string
+          id: string
+          is_active: boolean
+          last_paid_on: string
+          monthly_price: number
+          name: string
+          notes: string
+          owner_email: string
+          pay_status: string
+          pending_owner_email: string
+          phone_whatsapp: string
+          slug: string
+        }[]
+      }
+      admin_record_payment: {
+        Args: {
+          _amount: number
+          _note?: string
+          _paid_on: string
+          _shop: string
+        }
+        Returns: undefined
+      }
+      admin_save_subscription: {
+        Args: {
+          _due: string
+          _notes: string
+          _price: number
+          _shop: string
+          _status: string
+        }
+        Returns: undefined
+      }
+      admin_set_shop_active: {
+        Args: { _active: boolean; _reason?: string; _shop: string }
+        Returns: undefined
+      }
+      assert_superadmin: { Args: never; Returns: undefined }
+      claim_pending_shop: { Args: never; Returns: boolean }
       get_public_barbers: {
         Args: { _slug: string }
         Returns: {
@@ -302,10 +516,21 @@ export type Database = {
           slug: string
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_shop_owner: { Args: { _shop: string }; Returns: boolean }
+      write_audit: {
+        Args: { _action: string; _details: Json; _shop: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "superadmin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -432,6 +657,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["superadmin"],
+    },
   },
 } as const

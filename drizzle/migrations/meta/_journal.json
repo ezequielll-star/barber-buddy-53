@@ -43,6 +43,13 @@
       "when": 1793726236616,
       "tag": "0005_security_stage1",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793810850827,
+      "tag": "0006_booking_limit_and_pin_backup",
+      "breakpoints": true
     }
   ]
 }

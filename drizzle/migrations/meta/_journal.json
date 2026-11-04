@@ -50,6 +50,13 @@
       "when": 1793810850827,
       "tag": "0006_booking_limit_and_pin_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793816357912,
+      "tag": "0007_superadmin_panel",
+      "breakpoints": true
     }
   ]
 }

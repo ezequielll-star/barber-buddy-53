@@ -58,6 +58,9 @@ async function shopBySlug(slug: string): Promise<Shop | null> {
 
 const AR_TZ = "America/Argentina/Buenos_Aires";
 export const MAX_DAYS_AHEAD = 60;
+/** Pending (not done/cancelled, today or later) bookings allowed per WhatsApp in one shop. Mirrors the bookings_validate_limit trigger. */
+export const MAX_PENDING_PER_PHONE = 3;
+const LIMIT_MSG = "Ya tenés 3 reservas pendientes en esta barbería. Para sacar otra, esperá a que se cumpla alguna o escribí al local.";
 
 /** Current date (YYYY-MM-DD) and minutes since midnight in the shop's timezone (Argentina). */
 export function shopNow(now = new Date()) {
@@ -201,9 +204,12 @@ export const createBooking = createServerFn({ method: "POST" })
     let barberName: string | null = null;
     if (barberId) barberName = (await db.from("barbers").select("name").eq("id", barberId).eq("barbershop_id", shop.id).maybeSingle()).data?.name ?? null;
     const phone = data.whatsapp.replace(/\D/g, "");
+    const { count: pending } = await db.from("bookings").select("id", { count: "exact", head: true }).eq("barbershop_id", shop.id).eq("whatsapp", phone).not("status", "in", "(done,cancelled,canceled)").gte("booking_date", shopNow().date);
+    if ((pending ?? 0) >= MAX_PENDING_PER_PHONE) return { ok: false, message: LIMIT_MSG };
     const { error } = await db.from("bookings").insert({ barbershop_id: shop.id, service: data.service, booking_date: data.date, booking_time: data.time, barber_id: barberId, barber_name: barberName, client_name: data.name, whatsapp: phone });
     if (error) {
       if (error.code === "23505") return { ok: false, message: "Ese horario acaba de ocuparse. Elegí otro." };
+      if (error.message.includes("booking_limit")) return { ok: false, message: LIMIT_MSG };
       if (error.message.includes("shop_inactive")) return { ok: false, message: "Esta barbería se encuentra temporalmente inactiva." };
       if (error.message.includes("booking_")) return { ok: false, message: "Ese horario ya pasó o está fuera del rango de reservas. Elegí otro." };
       return { ok: false, message: "No se pudo guardar la reserva." };

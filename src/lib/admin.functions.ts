@@ -31,8 +31,6 @@ async function requireSuperadmin(supabase: { rpc: Function }, userId: string) {
   if (!data) throw new Error(FORBIDDEN);
 }
 
-const noInput = () => undefined as unknown;
-
 export const adminListShops = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -83,5 +81,3 @@ export const adminCreateShop = createServerFn({ method: "POST" })
 export const adminIsSuperadmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => !!(await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "superadmin" })).data);
-
-export const adminNoInput = noInput;

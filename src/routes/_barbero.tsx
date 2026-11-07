@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_barbero")({
     // Creates the owner's barbershop on first sign-in.
     let shop = null;
     for (let i = 0; i < 3 && !shop; i++) {
-      try { shop = await ensureMyShop(); } catch { await new Promise((r) => setTimeout(r, 800)); }
+      try { shop = await ensureMyShop(); } catch (err) { if (String(err).includes("ADMIN_PANEL")) throw redirect({ to: "/admin" }); await new Promise((r) => setTimeout(r, 800)); }
     }
     return { user: data.user, shop };
   },

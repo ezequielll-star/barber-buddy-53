@@ -10,16 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as BarberoRouteImport } from './routes/_barbero'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IngresarRouteImport } from './routes/ingresar'
 import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as BarberoIndexRouteImport } from './routes/_barbero/index'
 import { Route as BarberoAjustesRouteImport } from './routes/_barbero/ajustes'
 import { Route as BarberoCajaRouteImport } from './routes/_barbero/caja'
 import { Route as BarberoClientesRouteImport } from './routes/_barbero/clientes'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminNuevaRouteImport } from './routes/admin.nueva'
+import { Route as AdminRegistroRouteImport } from './routes/admin.registro'
 import { Route as BSlugRouteImport } from './routes/b.$slug'
+import { Route as AdminBIdRouteImport } from './routes/admin.b.$id'
 
 const BarberoRoute = BarberoRouteImport.update({
   id: '/_barbero',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IngresarRoute = IngresarRouteImport.update({
@@ -52,20 +62,45 @@ const BarberoClientesRoute = BarberoClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => BarberoRoute,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNuevaRoute = AdminNuevaRouteImport.update({
+  id: '/nueva',
+  path: '/nueva',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRegistroRoute = AdminRegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
+  getParentRoute: () => AdminRoute,
+} as any)
 const BSlugRoute = BSlugRouteImport.update({
   id: '/b/$slug',
   path: '/b/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminBIdRoute = AdminBIdRouteImport.update({
+  id: '/b/$id',
+  path: '/b/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof BarberoIndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/ingresar': typeof IngresarRoute
   '/reservar': typeof ReservarRoute
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
+  '/admin/nueva': typeof AdminNuevaRoute
+  '/admin/registro': typeof AdminRegistroRoute
   '/b/$slug': typeof BSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/b/$id': typeof AdminBIdRoute
 }
 export interface FileRoutesByTo {
   '/ingresar': typeof IngresarRoute
@@ -73,30 +108,44 @@ export interface FileRoutesByTo {
   '/ajustes': typeof BarberoAjustesRoute
   '/caja': typeof BarberoCajaRoute
   '/clientes': typeof BarberoClientesRoute
+  '/admin/nueva': typeof AdminNuevaRoute
+  '/admin/registro': typeof AdminRegistroRoute
   '/b/$slug': typeof BSlugRoute
   '/': typeof BarberoIndexRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/b/$id': typeof AdminBIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_barbero': typeof BarberoRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/ingresar': typeof IngresarRoute
   '/reservar': typeof ReservarRoute
   '/_barbero/ajustes': typeof BarberoAjustesRoute
   '/_barbero/caja': typeof BarberoCajaRoute
   '/_barbero/clientes': typeof BarberoClientesRoute
+  '/admin/nueva': typeof AdminNuevaRoute
+  '/admin/registro': typeof AdminRegistroRoute
   '/b/$slug': typeof BSlugRoute
   '/_barbero/': typeof BarberoIndexRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/b/$id': typeof AdminBIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/ingresar'
     | '/reservar'
     | '/ajustes'
     | '/caja'
     | '/clientes'
+    | '/admin/nueva'
+    | '/admin/registro'
     | '/b/$slug'
+    | '/admin/'
+    | '/admin/b/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/ingresar'
@@ -104,22 +153,32 @@ export interface FileRouteTypes {
     | '/ajustes'
     | '/caja'
     | '/clientes'
+    | '/admin/nueva'
+    | '/admin/registro'
     | '/b/$slug'
     | '/'
+    | '/admin'
+    | '/admin/b/$id'
   id:
     | '__root__'
     | '/_barbero'
+    | '/admin'
     | '/ingresar'
     | '/reservar'
     | '/_barbero/ajustes'
     | '/_barbero/caja'
     | '/_barbero/clientes'
+    | '/admin/nueva'
+    | '/admin/registro'
     | '/b/$slug'
     | '/_barbero/'
+    | '/admin/'
+    | '/admin/b/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   BarberoRoute: typeof BarberoRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
   IngresarRoute: typeof IngresarRoute
   ReservarRoute: typeof ReservarRoute
   BSlugRoute: typeof BSlugRoute
@@ -132,6 +191,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof BarberoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ingresar': {
@@ -176,12 +242,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BarberoClientesRouteImport
       parentRoute: typeof BarberoRoute
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/nueva': {
+      id: '/admin/nueva'
+      path: '/nueva'
+      fullPath: '/admin/nueva'
+      preLoaderRoute: typeof AdminNuevaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/registro': {
+      id: '/admin/registro'
+      path: '/registro'
+      fullPath: '/admin/registro'
+      preLoaderRoute: typeof AdminRegistroRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/b/$slug': {
       id: '/b/$slug'
       path: '/b/$slug'
       fullPath: '/b/$slug'
       preLoaderRoute: typeof BSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/b/$id': {
+      id: '/admin/b/$id'
+      path: '/b/$id'
+      fullPath: '/admin/b/$id'
+      preLoaderRoute: typeof AdminBIdRouteImport
+      parentRoute: typeof AdminRoute
     }
   }
 }
@@ -203,8 +297,25 @@ const BarberoRouteChildren: BarberoRouteChildren = {
 const BarberoRouteWithChildren =
   BarberoRoute._addFileChildren(BarberoRouteChildren)
 
+interface AdminRouteChildren {
+  AdminNuevaRoute: typeof AdminNuevaRoute
+  AdminRegistroRoute: typeof AdminRegistroRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminBIdRoute: typeof AdminBIdRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminNuevaRoute: AdminNuevaRoute,
+  AdminRegistroRoute: AdminRegistroRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminBIdRoute: AdminBIdRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   BarberoRoute: BarberoRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
   IngresarRoute: IngresarRoute,
   ReservarRoute: ReservarRoute,
   BSlugRoute: BSlugRoute,

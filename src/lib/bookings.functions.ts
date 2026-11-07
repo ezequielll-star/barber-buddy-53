@@ -86,10 +86,17 @@ export const ensureMyShop = createServerFn({ method: "POST" })
     const db = context.supabase as Db;
     const { data: mine } = await db.from("barbershops").select(SHOP_COLS).maybeSingle();
     if (mine) return mine;
+    // A shop reserved for this email by the superadmin gets claimed on first sign-in.
+    await db.rpc("claim_pending_shop");
+    const { data: claimed } = await db.from("barbershops").select(SHOP_COLS).maybeSingle();
+    if (claimed) return claimed;
     // RLS hides paused shops from their owner; look up only this user's status to show the lock screen.
     const adm = await admin();
     const { data: paused } = await adm.from("barbershops").select("name, is_active").eq("owner_id", context.userId).maybeSingle();
     if (paused?.is_active) throw new Error("No se pudo cargar tu barbería");
+    if (paused) return { id: "", name: paused.name, slug: "", phone_whatsapp: "", address: "", logo_url: "", open_time: "", close_time: "", open_days: [], is_active: false };
+    // A superadmin without a shop goes to the admin panel instead of getting an empty shop.
+    if ((await db.rpc("has_role", { _user_id: context.userId, _role: "superadmin" })).data) throw new Error("ADMIN_PANEL");
     if (paused) return { id: "", name: paused.name, slug: "", phone_whatsapp: "", address: "", logo_url: "", open_time: "", close_time: "", open_days: [], is_active: false };
     const base = String(context.claims?.email ?? "barberia").split("@")[0]!.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "barberia";
     const slug = `${base.length < 2 ? "barberia" : base}-${Math.random().toString(36).slice(2, 7)}`;
